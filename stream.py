@@ -3,7 +3,8 @@ from struct import pack, unpack
 from enum import IntEnum, unique
 from typing import override
 from os import SEEK_SET, SEEK_CUR, SEEK_END
-from .exceptions import ArgumentError, OperationError
+from .exception import ArgumentError, OperationError
+from .utility import Util
 
 
 @unique
@@ -561,7 +562,7 @@ class FileStream(Stream):
         if not self._file:
             raise OperationError("No file is open")
 
-        remain = self.tell() % alignment
+        remain = Util.align(self.tell(), alignment) - self.tell()
         if remain == 0:
             return
 
@@ -776,7 +777,7 @@ class BufferStream(Stream):
         if self._buffer == None:
             raise OperationError("No buffer is open")
 
-        remain = alignment - (self.tell() % alignment)
+        remain = Util.align(self.tell(), alignment) - self.tell()
         if remain == 0:
             return
 
@@ -811,6 +812,9 @@ class BufferStream(Stream):
 
         if not self._buffer:
             self._buffer = bytearray()
+
+        if isinstance(self._buffer, bytes):
+            self._buffer = bytearray(self._buffer)
 
     @override
     def close(self) -> None:

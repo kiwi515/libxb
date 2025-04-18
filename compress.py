@@ -1,45 +1,46 @@
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 from typing import override
 from enum import IntFlag, auto
 from dataclasses import dataclass
 from .stream import Stream, SeekDir, BufferStream
-from .exceptions import ArgumentError, DecompressionError, CompressionError
+from .exception import ArgumentError, DecompressionError
 
 
-class CompressionStrategy:
+class CompressionStrategy(ABC):
     """Data compression/decompression algorithm
     """
 
     @classmethod
     @abstractmethod
-    def compress(strm: Stream) -> bytes:
-        """Compresses the input data
+    def compress(cls, strm: Stream) -> BufferStream:
+        """Compresses the input data. The output data is prefixed with the
+        compression header (decomp size, compress size)
 
         Args:
             strm (Stream): Stream to decompressed data
 
         Returns:
-            bytes: Compressed data
+            BufferStream: Stream to compressed data
         """
         pass
 
     @classmethod
     @abstractmethod
-    def decompress(strm: Stream, expand_size: int) -> bytes:
-        """Decompresses the input data
+    def decompress(cls, strm: Stream) -> BufferStream:
+        """Decompresses the input data. The input data is expected to be prefixed
+        with the compression header (decomp size, compress size)
 
         Args:
             strm (Stream): Stream to compressed data
-            expand_size (int): Size of decompressed (expanded) data
 
         Returns:
-            bytes: Decompressed data
+            BufferStream: Stream to decompressed data
         """
         pass
 
 
-class ClapHanzLZ(CompressionStrategy):
-    """ClapHanz's implementation of LZ data compression
+class ClapHanzLZS(CompressionStrategy):
+    """ClapHanz's implementation of LZS data compression
     """
 
     MIN_RUN = 3
@@ -53,51 +54,62 @@ class ClapHanzLZ(CompressionStrategy):
 
     @classmethod
     @override
-    def compress(cls, strm: Stream) -> bytes:
-        """Compresses the input data
+    def compress(cls, strm: Stream) -> BufferStream:
+        """Compresses the input data. The output data is prefixed with the
+        compression header (decomp size, compress size)
 
         Args:
             strm (Stream): Stream to decompressed data
 
         Returns:
-            bytes: Compressed data
+            BufferStream: Stream to compressed data
         """
+        output = BufferStream(strm.endian)
 
         # TODO: Fake compression
-        with BufferStream(strm.endian) as out:
-            while not strm.eof():
-                chunk = strm.read(64)
-                code = (len(chunk) - 1) << 2
-                code |= cls.ChunkFlag.LITERAL
-                out.write_u8(code)
-                out.write(chunk)
+        while not strm.eof():
+            chunk = strm.read(64)
+            code = (len(chunk) - 1) << 2 | cls.ChunkFlag.LITERAL
+            output.write_u8(code)
+            output.write(chunk)
 
-            return out.result()
+        # Write header
+        output.seek(SeekDir.BEGIN, 0)
+        output.write_u32(strm.length())    # Decomp size
+        output.write_u32(output.length())  # Compress size
+
+        output.seek(SeekDir.BEGIN, 0)
+        return output
 
     @classmethod
     @override
-    def decompress(cls, strm: Stream, expand_size: int) -> bytes:
-        """Decompresses the input data
+    def decompress(cls, strm: Stream) -> BufferStream:
+        """Decompresses the input data. The input data is expected to be prefixed
+        with the compression header (decomp size, compress size)
 
         Args:
             strm (Stream): Stream to compressed data
-            expand_size (int): Size of decompressed (expanded) data
 
         Returns:
-            bytes: Decompressed data
+            BufferStream: Stream to decompressed data
 
         Raises
             ArgumentError: Invalid argument(s) provided
             DecompressionError: Decompression cannot be completed
         """
-        if expand_size <= 0:
-            raise ArgumentError("Invalid expanded size")
+        decomp_size = strm.read_u32()
+        compress_size = strm.read_u32()
 
-        output = bytearray(expand_size)
+        if decomp_size == 0:
+            raise ArgumentError("Invalid decompressed size")
+        if compress_size == 0:
+            raise DecompressionError("Data is not compressed")
+
+        output = bytearray(decomp_size)
         out_idx = 0
 
         try:
-            while out_idx < expand_size:
+            while out_idx < decomp_size:
                 code = strm.read_u8()
 
                 # Literal copy
@@ -113,7 +125,6 @@ class ClapHanzLZ(CompressionStrategy):
                     run_len = 0
 
                     # Short-distance run
-                    # 3 bits for the run length
                     if code & cls.ChunkFlag.SHORTRUN:
                         b0 = strm.read_u8()
                         value = b0 << 8 | code
@@ -121,7 +132,6 @@ class ClapHanzLZ(CompressionStrategy):
                         run_len = ((value & 0b1110) >> 1) + cls.MIN_RUN
                         run_offset = value >> 4
                     # Long-distance run
-                    # 14 bits for the run length
                     else:
                         b0 = strm.read_u8()
                         b1 = strm.read_u8()
@@ -141,7 +151,7 @@ class ClapHanzLZ(CompressionStrategy):
         except EOFError:
             raise DecompressionError("Hit the end-of-file while decompressing")
 
-        return bytes(output)
+        return BufferStream(strm.endian, output)
 
 
 class ClapHanzHuffman(CompressionStrategy):
@@ -160,50 +170,55 @@ class ClapHanzHuffman(CompressionStrategy):
 
     @classmethod
     @override
-    def compress(cls, strm: Stream) -> bytes:
-        """Compresses the input data
+    def compress(cls, strm: Stream) -> BufferStream:
+        """Compresses the input data. The output data is prefixed with the
+        compression header (decomp size, compress size)
 
         Args:
             strm (Stream): Stream to decompressed data
 
         Returns:
-            bytes: Compressed data
+            BufferStream: Stream to compressed data
         """
         raise NotImplementedError()
 
     @classmethod
     @override
-    def decompress(cls, strm: Stream, expand_size: int) -> bytes:
-        """Decompresses the input data
+    def decompress(cls, strm: Stream) -> BufferStream:
+        """Decompresses the input data. The input data is expected to be prefixed
+        with the compression header (decomp size, compress size)
 
         Args:
             strm (Stream): Stream to compressed data
-            expand_size (int): Size of decompressed (expanded) data
 
         Returns:
-            bytes: Decompressed data
+            BufferStream: Stream to decompressed data
 
         Raises
             ArgumentError: Invalid argument(s) provided
             DecompressionError: Decompression cannot be completed
         """
-        if expand_size <= 0:
-            raise ArgumentError("Invalid expanded size")
+        decomp_size = strm.read_u32()
+        compress_size = strm.read_u32()
+
+        if decomp_size == 0:
+            raise ArgumentError("Invalid decompressed size")
+        if compress_size == 0:
+            raise DecompressionError("Data is not compressed")
 
         # Build the Huffman decoding table
         try:
-            table = cls.__create_huffman_table(strm)
+            table = cls._rebuild_huffman_table(strm)
         except (IndexError, EOFError):
             raise DecompressionError("Failed to create Huffman table")
 
-        output = bytearray(expand_size)
-        out_idx = 0
+        output = BufferStream(strm.endian)
 
         bit_num = 0
         bit_strm = 0
 
         try:
-            while out_idx < expand_size:
+            while output.length() < decomp_size:
                 # Read Huffman code and find the table entry
                 if bit_num < cls.MAX_DEPTH:
                     bit_strm |= strm.read_u16() << bit_num
@@ -215,8 +230,7 @@ class ClapHanzHuffman(CompressionStrategy):
                 # Huffman symbol
                 if entry.length <= cls.MAX_DEPTH:
                     # Consume bits based on the symbol length
-                    output[out_idx] = entry.symbol
-                    out_idx += 1
+                    output.write_u8(entry.symbol)
                     bit_strm >>= entry.length
                     bit_num -= entry.length
                 # Literal byte
@@ -230,8 +244,7 @@ class ClapHanzHuffman(CompressionStrategy):
                         bit_num += 16
 
                     # Consume one byte (8 bits)
-                    output[out_idx] = bit_strm & 0xFF
-                    out_idx += 1
+                    output.write_u8(bit_strm & 0xFF)
                     bit_strm >>= 8
                     bit_num -= 8
         except IndexError:
@@ -239,10 +252,11 @@ class ClapHanzHuffman(CompressionStrategy):
         except EOFError:
             raise DecompressionError("Hit the end-of-file while decompressing")
 
+        output.seek(SeekDir.BEGIN, 0)
         return output
 
     @classmethod
-    def __create_huffman_table(cls, strm: Stream) -> list[Symbol]:
+    def _rebuild_huffman_table(cls, strm: Stream) -> list[Symbol]:
         """Reconstructs a flat Huffman decoding table from input code data
 
         Args:
@@ -259,8 +273,8 @@ class ClapHanzHuffman(CompressionStrategy):
         table = [None for _ in range(cls.TABLE_SIZE)]
 
         max_length = strm.read_u8()
-        if max_length <= 0:
-            raise DecompressionError("Compressed data is malformed")
+        if max_length == 0:
+            raise DecompressionError("Huffman code data is malformed")
 
         code = 0
         length = 1
@@ -301,3 +315,38 @@ class ClapHanzHuffman(CompressionStrategy):
             strm.seek(SeekDir.CURRENT, 1)
 
         return table
+
+
+class ClapHanzDeflate(CompressionStrategy):
+    """ClapHanz's implementation of Deflate data compression (LZS + Huffman)
+    """
+
+    @classmethod
+    @override
+    def compress(cls, strm: Stream) -> BufferStream:
+        """Compresses the input data. The output data is prefixed with the
+        compression header (decomp size, compress size)
+
+        Args:
+            strm (Stream): Stream to decompressed data
+
+        Returns:
+            BufferStream: Stream to compressed data
+        """
+        lz_strm = ClapHanzLZS.compress(strm)
+        return ClapHanzHuffman.compress(lz_strm)
+
+    @classmethod
+    @override
+    def decompress(cls, strm: Stream) -> BufferStream:
+        """Decompresses the input data. The input data is expected to be prefixed
+        with the compression header (decomp size, compress size)
+
+        Args:
+            strm (Stream): Stream to compressed data
+
+        Returns:
+            BufferStream: Stream to decompressed data
+        """
+        lz_strm = ClapHanzHuffman.decompress(strm)
+        return ClapHanzLZS.decompress(lz_strm)
