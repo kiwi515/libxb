@@ -4,8 +4,8 @@ from os import SEEK_CUR, SEEK_END, SEEK_SET
 from struct import pack, unpack
 from typing import override
 
-from .exception import ArgumentError, OperationError
-from .utility import Util
+from .exceptions import ArgumentError, OperationError
+from .utils import Util
 
 
 @unique

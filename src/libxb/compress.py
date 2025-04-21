@@ -3,8 +3,8 @@ from dataclasses import dataclass
 from enum import IntFlag, auto
 from typing import override
 
-from .exception import ArgumentError, DecompressionError
-from .stream import BufferStream, SeekDir, Stream
+from .exceptions import ArgumentError, DecompressionError
+from .streams import BufferStream, SeekDir, Stream
 
 
 class CompressionStrategy(ABC):

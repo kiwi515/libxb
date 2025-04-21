@@ -3,7 +3,7 @@ from os import makedirs
 from os.path import dirname
 
 from .compress import ClapHanzDeflate, ClapHanzHuffman, ClapHanzLZS
-from .exception import (
+from .exceptions import (
     ArchiveError,
     ArchiveExistsError,
     ArchiveNotFoundError,
@@ -12,8 +12,8 @@ from .exception import (
     DecompressionError,
     NotAnArchiveError,
 )
-from .stream import BufferStream, FileStream, SeekDir
-from .utility import Util
+from .streams import BufferStream, FileStream, SeekDir
+from .utils import Util
 
 
 @unique
