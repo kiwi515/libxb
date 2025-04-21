@@ -1,0 +1,26 @@
+[project]
+name = "libxb"
+version = "0.1.0"
+authors = [
+  { name="Kiwi" },
+]
+description = "A library for the ClapHanz XB archive format"
+readme = { file="README.md", content-type="text/markdown" }
+requires-python = ">=3.10"
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Operating System :: OS Independent",
+  "Development Status :: 4 - Beta",
+  "Topic :: File Formats",
+  "Topic :: Software Development :: Libraries",
+]
+license = "MIT"
+license-files = ["LICEN[CS]E*"]
+
+[project.urls]
+Homepage = "https://github.com/kiwi515/libxb"
+Issues = "https://github.com/kiwi515/libxb/issues"
+
+[build-system]
+requires = ["hatchling >= 1.26"]
+build-backend = "hatchling.build"

@@ -1,8 +1,9 @@
 from abc import ABC, abstractmethod
-from struct import pack, unpack
 from enum import IntEnum, unique
+from os import SEEK_CUR, SEEK_END, SEEK_SET
+from struct import pack, unpack
 from typing import override
-from os import SEEK_SET, SEEK_CUR, SEEK_END
+
 from .exception import ArgumentError, OperationError
 from .utility import Util
 

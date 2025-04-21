@@ -1,9 +1,10 @@
 from abc import ABC, abstractmethod
-from typing import override
-from enum import IntFlag, auto
 from dataclasses import dataclass
-from .stream import Stream, SeekDir, BufferStream
+from enum import IntFlag, auto
+from typing import override
+
 from .exception import ArgumentError, DecompressionError
+from .stream import BufferStream, SeekDir, Stream
 
 
 class CompressionStrategy(ABC):

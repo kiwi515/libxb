@@ -1,5 +1,6 @@
-from .archive import XBArchive, XBFile
 from typing import override
+
+from .archive import XBArchive, XBFile
 
 
 class MNG3Archive(XBArchive):

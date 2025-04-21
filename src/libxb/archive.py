@@ -1,10 +1,18 @@
 from enum import IntEnum, unique
-from os.path import dirname
 from os import makedirs
-from .exception import (ArgumentError, ArchiveError, ArchiveNotFoundError,
-                        ArchiveExistsError, BadArchiveError, NotAnArchiveError, DecompressionError)
-from .stream import FileStream, BufferStream, SeekDir
-from .compress import ClapHanzLZS, ClapHanzHuffman, ClapHanzDeflate
+from os.path import dirname
+
+from .compress import ClapHanzDeflate, ClapHanzHuffman, ClapHanzLZS
+from .exception import (
+    ArchiveError,
+    ArchiveExistsError,
+    ArchiveNotFoundError,
+    ArgumentError,
+    BadArchiveError,
+    DecompressionError,
+    NotAnArchiveError,
+)
+from .stream import BufferStream, FileStream, SeekDir
 from .utility import Util
 
 
@@ -335,6 +343,9 @@ class XBArchive:
         else:
             strtab_strm = BufferStream(
                 self.endian, self._strm.read(strtab_decomp_size))
+
+        with open("DEBUG.BIN", "wb+") as f:
+            f.write(strtab_strm.result())
 
         # Parse the string table
         try:
