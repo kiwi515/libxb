@@ -1,11 +1,11 @@
 from typing import override
 
-from .archive import XBArchive, XBFile
+from .archive.archive import XBArchive, XBFile
 
 
 class MNG3Archive(XBArchive):
-    """XB archive for Minna no Golf 3 / Hot Shots Golf 3
-    """
+    """XB archive for Minna no Golf 3 / Hot Shots Golf 3"""
+
     ENDIAN = "<"
 
     def __init__(self, path: str, open_mode: str):
@@ -25,8 +25,8 @@ class MNG3Archive(XBArchive):
 
 
 class MNG4Archive(XBArchive):
-    """XB archive for Minna no Golf 4 / Hot Shots Golf Fore!
-    """
+    """XB archive for Minna no Golf 4 / Hot Shots Golf Fore!"""
+
     ENDIAN = "<"
 
     def __init__(self, path: str, open_mode: str):
@@ -46,8 +46,8 @@ class MNG4Archive(XBArchive):
 
 
 class MNGPArchive(XBArchive):
-    """XB archive for the Minna no Golf Portable / Hot Shots Golf: Open Tee games
-    """
+    """XB archive for the Minna no Golf Portable / Hot Shots Golf: Open Tee games"""
+
     ENDIAN = "<"
 
     def __init__(self, path: str, open_mode: str, create_outside: bool = True):
@@ -104,8 +104,8 @@ class MNGPArchive(XBArchive):
 
 
 class MNG5Archive(XBArchive):
-    """XB archive for Minna no Golf 5 / Hot Shots Golf: Out of Bounds
-    """
+    """XB archive for Minna no Golf 5 / Hot Shots Golf: Out of Bounds"""
+
     ENDIAN = ">"
 
     def __init__(self, path: str, open_mode: str):
@@ -140,8 +140,7 @@ class MNG5Archive(XBArchive):
 
 
 class MNG6Archive(XBArchive):
-    """XB archive for Minna no Golf 6 / Hot Shots Golf: World Invitational
-    """
+    """XB archive for Minna no Golf 6 / Hot Shots Golf: World Invitational"""
 
     def __init__(self, path: str, open_mode: str):
         """Constructor

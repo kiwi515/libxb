@@ -1,6 +1,11 @@
+from enum import Enum
+from typing import Type
+
+from .exceptions import OperationError
+
+
 class Util:
-    """Utility functions
-    """
+    """Utility functions"""
 
     @staticmethod
     def align(thing, alignment: int):
@@ -30,3 +35,22 @@ class Util:
 
         thing.align(alignment)
         return thing
+
+    @staticmethod
+    def convert_enum(from_value: Enum, to_type: Type[Enum]):
+        """Attempts to convert an enum value to the same name in another enum
+
+        Args:
+            from_value (Enum): Value to convert
+            to_type (Type[Enum]): Type to convert to
+
+        Raises:
+            OperationError: Invalid enum conversion
+
+        Returns:
+            to_type: Converted value
+        """
+        try:
+            return to_type[from_value.name]
+        except KeyError:
+            raise OperationError(f"Invalid {to_type.__name__}")
