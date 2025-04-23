@@ -80,11 +80,11 @@ class ClapHanzLZS(CompressionStrategy):
             output.write(chunk)
 
         # Write header
-        output.seek(SeekDir.BEGIN, 0)
+        output.seek(SeekDir.BEGIN)
         output.write_u32(strm.length())  # Decomp size
         output.write_u32(output.length())  # Compress size
 
-        output.seek(SeekDir.BEGIN, 0)
+        output.seek(SeekDir.BEGIN)
         return output
 
     @classmethod
@@ -109,9 +109,9 @@ class ClapHanzLZS(CompressionStrategy):
             ArgumentError: Invalid argument(s) provided
             DecompressionError: Decompression cannot be completed
         """
-        if expand_size == None:
+        if expand_size is None:
             expand_size = strm.read_u32()
-        if compress_size == None:
+        if compress_size is None:
             compress_size = strm.read_u32()
 
         if expand_size == 0:
@@ -217,9 +217,9 @@ class ClapHanzHuffman(CompressionStrategy):
             ArgumentError: Invalid argument(s) provided
             DecompressionError: Decompression cannot be completed
         """
-        if expand_size == None:
+        if expand_size is None:
             expand_size = strm.read_u32()
-        if compress_size == None:
+        if compress_size is None:
             compress_size = strm.read_u32()
 
         if expand_size == 0:
@@ -273,7 +273,7 @@ class ClapHanzHuffman(CompressionStrategy):
         except EOFError:
             raise DecompressionError("Hit the end-of-file while decompressing")
 
-        output.seek(SeekDir.BEGIN, 0)
+        output.seek(SeekDir.BEGIN)
         return output
 
     @classmethod

@@ -3,15 +3,18 @@ from contextlib import AbstractContextManager
 from enum import IntEnum, auto, unique
 from os import makedirs, walk
 from os.path import dirname, isdir, join
+from typing import TypeAlias
 
-from .exceptions import (
+from ..core.exceptions import (
     ArchiveError,
     ArchiveExistsError,
     ArchiveNotFoundError,
     ArgumentError,
-    BadArchiveError,
 )
-from .streams import FileStream
+from ..core.streams import Endian, FileStream, OpenMode
+
+XBEndian: TypeAlias = Endian
+XBOpenMode: TypeAlias = OpenMode
 
 
 @unique
@@ -43,7 +46,7 @@ class XBFile:
         if not data:
             raise ArgumentError("No data provided")
 
-        self.path: str = path
+        self.path: str = path.replace("/", "\\")
         self.data: bytes | bytearray = data
         self.compression: XBCompression = compression
 
@@ -102,13 +105,13 @@ class XBArchive(AbstractContextManager):
 
             return hash & 0xFF
 
-    def __init__(self, path: str, open_mode: str):
+    def __init__(self, path: str, mode: XBOpenMode, endian: XBEndian):
         """Constructor
 
         Args:
             path (str): File path to open
-            open_mode (str): Open mode string: "r" (read) / "w" (write) / "x" (create),
-                             followed by ':', and '<' for little endian or '>' for big endian.
+            mode (XBOpenMode): File open mode
+            endian (XBEndian): File endianness
 
         Raises:
             ArgumentError: Invalid argument(s) provided
@@ -116,15 +119,7 @@ class XBArchive(AbstractContextManager):
             ArchiveExistsError: Archive file already exists
             BadArchiveError: Archive file is broken or corrupted
         """
-        self.__open_mode: str = None
-
-        self._strm: FileStream = None
-        self._files: list[XBFile] = []
-
-        self._fst: list[XBArchive.FileSystemEntry] = []
-        self._strtab: list[XBArchive.StringTableEntry] = []
-
-        self.open(path, open_mode)
+        self.open(path, mode, endian)
 
     @property
     def path(self) -> str:
@@ -149,13 +144,13 @@ class XBArchive(AbstractContextManager):
         """Exits the runtime context, closing the XB archive"""
         self.close()
 
-    def open(self, path: str, open_mode: str) -> None:
+    def open(self, path: str, mode: XBOpenMode, endian: XBEndian) -> None:
         """Opens an XB archive
 
         Args:
             path (str): File path to open
-            open_mode (str): Open mode string: "r" (read) / "w" (write) / "x" (create),
-                             followed by ':', and '<' for little endian or '>' for big endian.
+            mode (XBOpenMode): File open mode
+            endian (XBEndian): File endianness
 
         Raises:
             ArgumentError: Invalid argument(s) provided
@@ -163,26 +158,36 @@ class XBArchive(AbstractContextManager):
             ArchiveExistsError: Archive file already exists
             BadArchiveError: Archive file is broken or corrupted
         """
+        if mode not in XBOpenMode:
+            raise ArgumentError("Invalid XBOpenMode")
+        if endian not in XBEndian:
+            raise ArgumentError("Invalid XBEndian")
+
+        self._strm: FileStream = None
+        self._files: list[XBFile] = []
+
+        self._fst: list[XBArchive.FileSystemEntry] = []
+        self._strtab: list[XBArchive.StringTableEntry] = []
+
         try:
-            self._strm = FileStream(path, open_mode)
-        except ValueError:
-            raise ArgumentError(f"Invalid archive openmode: {open_mode}")
+            self._strm = FileStream(path, mode, endian)
         except FileNotFoundError:
             raise ArchiveNotFoundError(f"Archive does not exist: {path}")
         except FileExistsError:
             raise ArchiveExistsError(f"Archive already exists: {path}")
 
-        # We are only concerned about the access mode
-        self.__open_mode = open_mode.split(":")[0]
-
         # Need to read existing content
-        if self.__open_mode == "r":
+        if self._strm.mode in (XBOpenMode.READ, XBOpenMode.RW):
             self._read()
 
     def close(self) -> None:
         """Closes the XB archive, committing any changes made"""
         # Need to write existing content
-        if self.__open_mode in ("w", "x"):
+        if self._strm.mode in (
+            XBOpenMode.WRITE,
+            XBOpenMode.RW,
+            XBOpenMode.CREATE,
+        ):
             self._write()
 
         self._strm.close()
@@ -216,8 +221,11 @@ class XBArchive(AbstractContextManager):
         # Process all files in directory
         if isdir(path):
             for wpath, _, wfiles in walk(path):
+                if xb_path:
+                    wpath = wpath.replace(path, xb_path)
+
                 for file in wfiles:
-                    self.add(join(wpath, file))
+                    self.add(join(wpath, file), xb_path, compression, recursive)
 
                 if not recursive:
                     break
@@ -248,7 +256,7 @@ class XBArchive(AbstractContextManager):
                                             Ignore this field to extract all files.
         """
         # Default behavior attempts to extract all files
-        if files == None:
+        if files is None:
             files = self._files
 
         for file in files:
@@ -265,6 +273,9 @@ class XBArchive(AbstractContextManager):
         # Allow subclasses to modify/reject file
         if not self._on_extract(file):
             return
+
+        # Safety filter for some games
+        file.path = file.path.replace("..\\", "")
 
         # Need to create directory structure
         dst_path = f"{path}/{file.path}"

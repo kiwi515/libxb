@@ -1,57 +1,74 @@
-from abc import ABC, abstractmethod
-from enum import IntEnum, unique
+from abc import abstractmethod
+from contextlib import AbstractContextManager
+from enum import IntEnum, StrEnum, unique
 from os import SEEK_CUR, SEEK_END, SEEK_SET
 from struct import pack, unpack
-from typing import override
+from typing import TypeAlias, override
 
 from .exceptions import ArgumentError, OperationError
 from .utils import Util
+
+ByteBuffer: TypeAlias = bytes | bytearray
+
+
+@unique
+class Endian(StrEnum):
+    """Byte-order/endianness.
+    Designed to be compatible with struct functions."""
+
+    LITTLE = "<"
+    BIG = ">"
+
+
+@unique
+class OpenMode(StrEnum):
+    """File access mode.
+    Designed to be compatible with OS functions."""
+
+    READ = "r"
+    WRITE = "w"
+    RW = "+"
+    CREATE = "x"
 
 
 @unique
 class SeekDir(IntEnum):
     """Seek origin point.
-    Compatible with OS file objects.
+    Designed to be compatible with OS functions.
     """
+
     BEGIN = SEEK_SET
     CURRENT = SEEK_CUR
     END = SEEK_END
 
 
-class Stream(ABC):
+class Stream(AbstractContextManager):
     """Base stream class.
     Derived classes can be used as context managers ('with' statements).
     """
 
-    def __init__(self, endian: str):
+    def __init__(self, endian: Endian):
         """Constructor
 
         Args:
-            endian (Endian): Endianness ('<' for little endian, '>' for big endian)
+            endian (Endian): Stream endianness
 
         Raises:
             ArgumentError: Invalid endianness provided
         """
-        if endian not in ("<", ">"):
+        if endian not in Endian:
             raise ArgumentError("Invalid endianness")
 
-        self._endian = endian
-
-    def __enter__(self):
-        """Enters the runtime context, opening the stream
-        """
-        return self
-
-    def __exit__(self, exc_type, exc_value, traceback):
-        """Exits the runtime context, closing the stream
-        """
-        self.close()
+        self._endian: Endian = endian
 
     @property
     def endian(self):
-        """Accesses the stream's endianness (read-only)
-        """
+        """Accesses the stream's endianness (read-only)"""
         return self._endian
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        """Exits the runtime context, closing the stream"""
+        self.close()
 
     @abstractmethod
     def read(self, size: int = -1) -> bytes:
@@ -63,16 +80,16 @@ class Stream(ABC):
         Returns:
             bytes: Bytes read
         """
-        pass
+        raise NotImplementedError()
 
     @abstractmethod
-    def write(self, data: bytes | bytearray) -> None:
+    def write(self, data: ByteBuffer) -> None:
         """Writes bytes to the stream
 
         Args:
-            data (bytes | bytearray): Data to write
+            data (ByteBuffer): Data to write
         """
-        pass
+        raise NotImplementedError()
 
     @abstractmethod
     def eof(self) -> bool:
@@ -81,17 +98,17 @@ class Stream(ABC):
         Returns:
             bool: Whether the stream has hit the end of the file
         """
-        pass
+        raise NotImplementedError()
 
     @abstractmethod
-    def seek(self, origin: SeekDir, offset: int) -> None:
+    def seek(self, origin: SeekDir, offset: int = 0) -> None:
         """Seeks the stream position
 
         Args:
             origin (SeekDir): Seek origin point
-            offset (int): Seek distance
+            offset (int, optional): Seek distance. Defaults to zero.
         """
-        pass
+        raise NotImplementedError()
 
     @abstractmethod
     def tell(self) -> int:
@@ -100,7 +117,7 @@ class Stream(ABC):
         Returns:
             int: Stream position (from begin)
         """
-        pass
+        raise NotImplementedError()
 
     @abstractmethod
     def align(self, alignment: int) -> None:
@@ -109,7 +126,7 @@ class Stream(ABC):
         Args:
             alignment (int): Byte alignment boundary
         """
-        pass
+        raise NotImplementedError()
 
     @abstractmethod
     def length(self) -> int:
@@ -118,12 +135,10 @@ class Stream(ABC):
         Returns:
             int: Stream length
         """
-        pass
+        raise NotImplementedError()
 
-    @abstractmethod
     def close(self) -> None:
-        """Closes the stream
-        """
+        """Closes the stream"""
         pass
 
     def read_s8(self) -> int:
@@ -280,8 +295,9 @@ class Stream(ABC):
 
         return string
 
-    def write_string(self, string: str, maxlen: int = -1,
-                     terminate: bool = True) -> None:
+    def write_string(
+        self, string: str, maxlen: int = -1, terminate: bool = True
+    ) -> None:
         """Writes a UTF-8 string to the stream
 
         Args:
@@ -294,7 +310,7 @@ class Stream(ABC):
         if maxlen >= 0:
             # Reserve last space for null terminator
             term_size = 1 if terminate else 0
-            string = string[:maxlen - term_size]
+            string = string[: maxlen - term_size]
 
         self.write(string.encode("utf-8"))
 
@@ -327,8 +343,9 @@ class Stream(ABC):
 
         return string
 
-    def write_wstring(self, string: str, maxlen: int = -1,
-                      terminate: bool = True) -> None:
+    def write_wstring(
+        self, string: str, maxlen: int = -1, terminate: bool = True
+    ) -> None:
         """Writes a wide-char (UTF-16) string to the stream
 
         Args:
@@ -341,7 +358,7 @@ class Stream(ABC):
         if maxlen >= 0:
             term_size = 1 if terminate else 0
             # Truncate if string is too long
-            string = string[:maxlen - term_size]
+            string = string[: maxlen - term_size]
 
         self.write(string.encode("utf-16-be"))
 
@@ -374,8 +391,8 @@ class Stream(ABC):
             bytes: Byte representations
         """
         endian = {
-            "<": "little",
-            ">": "big",
+            Endian.LITTLE: "little",
+            Endian.BIG: "big",
         }[self._endian]
 
         return int.to_bytes(value, length=size, byteorder=endian, signed=signed)
@@ -391,8 +408,8 @@ class Stream(ABC):
             int: Integer value
         """
         endian = {
-            "<": "little",
-            ">": "big",
+            Endian.LITTLE: "little",
+            Endian.BIG: "big",
         }[self._endian]
 
         return int.from_bytes(data, byteorder=endian, signed=signed)
@@ -427,27 +444,33 @@ class Stream(ABC):
 
 
 class FileStream(Stream):
-    """Physical file stream
-    """
+    """Physical file stream"""
 
-    def __init__(self, path: str, open_mode: str):
+    def __init__(self, path: str, mode: OpenMode, endian: Endian):
         """Constructor
 
         Args:
             path (str): File path to open
-            open_mode (str): Open mode string: "r" (read) / "w" (write) / "x" (create),
-                             followed by ':', and '<' for little endian or '>' for big endian.
+            mode (OpenMode): File access mode
+            endian (Endian): File endianness
         """
-        super().__init__("<")
+        super().__init__(endian)
 
-        self._file = None
-        self.open(path, open_mode)
+        self.__path: str = ""
+        self.__mode: OpenMode = None
+        self.__file = None
+
+        self.open(path, mode, endian)
 
     @property
-    def path(self):
-        """Accesses the streams's filepath (read-only)
-        """
-        return self._path
+    def path(self) -> str:
+        """Accesses the streams's filepath (read-only)"""
+        return self.__path
+
+    @property
+    def mode(self) -> OpenMode:
+        """Accesses the streams's open mode (read-only)"""
+        return self.__mode
 
     @override
     def read(self, size: int = -1) -> bytes:
@@ -464,32 +487,32 @@ class FileStream(Stream):
             EOFError: Stream has hit the end-of-file (EOF)
             OperationError: Stream is write-only
         """
-        if not self._file:
+        if not self.__file:
             raise OperationError("No file is open")
         if self.eof():
             raise EOFError("Hit end-of-file")
-        if "r" not in self._open_mode:
-            raise OperationError("Not for this openmode")
+        if self.__mode not in (OpenMode.READ, OpenMode.RW):
+            raise OperationError("Stream is write-only")
 
-        return self._file.read(size)
+        return self.__file.read(size)
 
     @override
-    def write(self, data: bytes | bytearray) -> None:
+    def write(self, data: ByteBuffer) -> None:
         """Writes bytes to the stream
 
         Args:
-            data (bytes | bytearray): Data to write
+            data (ByteBuffer): Data to write
 
         Raises:
             OperationError: Stream is not open
             OperationError: Stream is read-only
         """
-        if not self._file:
+        if not self.__file:
             raise OperationError("No file is open")
-        if "w" not in self._open_mode:
-            raise OperationError("Not for this openmode")
+        if self.__mode not in (OpenMode.WRITE, OpenMode.RW, OpenMode.CREATE):
+            raise OperationError("Stream is read-only")
 
-        self._file.write(data)
+        self.__file.write(data)
 
     @override
     def eof(self) -> bool:
@@ -501,35 +524,44 @@ class FileStream(Stream):
         Raises:
             OperationError: Stream is not open
         """
-        if not self._file:
+        if not self.__file:
             raise OperationError("No file is open")
 
-        if "r" not in self._open_mode:
+        # With write permission, you can kinda just do whatever
+        if self.__mode not in (OpenMode.READ, OpenMode.RW):
             return False
 
         # Try to peek one byte
-        if len(self._file.read(1)) == 0:
+        if not self.__file.read(1):
             return True
 
         # Undo read operation
-        self._file.seek(-1, SeekDir.CURRENT)
+        self.seek(SeekDir.CURRENT, -1)
+
         return False
 
     @override
-    def seek(self, origin: SeekDir, offset: int) -> None:
+    def seek(self, origin: SeekDir, offset: int = 0) -> None:
         """Seeks the stream position
 
         Args:
             origin (SeekDir): Seek origin point
-            offset (int): Seek distance
+            offset (int, optional): Seek distance. Defaults to zero.
 
         Raises:
             OperationError: Stream is not open
         """
-        if not self._file:
+        if origin not in SeekDir:
+            raise ArgumentError("Invalid SeekDir")
+        if not self.__file:
             raise OperationError("No file is open")
 
-        self._file.seek(offset, origin)
+        if origin == SeekDir.BEGIN and offset < 0:
+            raise ArgumentError("Invalid seek offset from begin")
+        if origin == SeekDir.END and offset > 0:
+            raise ArgumentError("Invalid seek offset from end")
+
+        self.__file.seek(offset, origin)
 
     @override
     def tell(self) -> int:
@@ -541,10 +573,10 @@ class FileStream(Stream):
         Raises:
             OperationError: Stream is not open
         """
-        if not self._file:
+        if not self.__file:
             raise OperationError("No file is open")
 
-        return self._file.tell()
+        return self.__file.tell()
 
     @override
     def align(self, alignment: int) -> None:
@@ -560,17 +592,17 @@ class FileStream(Stream):
         """
         if alignment < 0:
             raise ArgumentError("Invalid alignment")
-        if not self._file:
+        if not self.__file:
             raise OperationError("No file is open")
 
         remain = Util.align(self.tell(), alignment) - self.tell()
         if remain == 0:
             return
 
-        match self._open_mode[0]:
-            case "r":
+        match self.__mode:
+            case OpenMode.READ:
                 self.seek(SeekDir.CURRENT, remain)
-            case "w" | "x":
+            case OpenMode.WRITE | OpenMode.RW | OpenMode.CREATE:
                 self.write_padding(remain)
 
     @override
@@ -580,84 +612,70 @@ class FileStream(Stream):
         Returns:
             int: Stream length
         """
-        if not self._file:
+        if not self.__file:
             raise OperationError("No file is open")
 
-        return self._length
+        return self.__length
 
-    def open(self, path: str, open_mode: str) -> None:
+    def open(self, path: str, mode: OpenMode, endian: Endian) -> None:
         """Opens the specified file
 
         Args:
             path (str): File path to open
-            open_mode (str): Open mode string: "r" (read) / "w" (write) / "x" (create),
-                             followed by ':', and '<' for little endian or '>' for big endian.
+            mode (OpenMode): File access mode
+            endian (Endian): File endianness
+
+        Raises:
+            ArgumentError: Invalid argument(s) provided
         """
+        if mode not in OpenMode:
+            raise ArgumentError("Invalid OpenMode")
+        if endian not in Endian:
+            raise ArgumentError("Invalid Endian")
+
         # Close existing file
-        if self._file:
+        if self.__file:
             self.close()
 
-        self._path = path
-        self.__set_open_mode(open_mode)
-        self._file = open(self._path, self._open_mode)
+        self.__path = path
+        self.__mode = mode
+        self._endian = endian
 
-        # Store filesize for later
-        self._file.seek(0, SEEK_END)
-        self._length = self._file.tell()
-        self._file.seek(0, SEEK_SET)
+        # Force binary mode
+        os_mode = f"{self.__mode}b"
+        self.__file = open(self.__path, os_mode)
+
+        self.seek(SeekDir.END)
+        self.__length = self.__file.tell()
+        self.seek(SeekDir.BEGIN)
 
     @override
     def close(self) -> None:
-        """Closes the stream
-        """
-        if self._file:
-            self._file.close()
-            self._file = None
-
-    def __set_open_mode(self, open_mode: str) -> None:
-        """Sets the open mode of the stream
-
-        Args:
-            open_mode (str): Open mode string: "r" (read) / "w" (write) / "x" (create),
-                             followed by ':', and '<' for little endian or '>' for big endian.
-
-        Raises:
-            ArgumentError: Invalid openmode provided
-        """
-        # Split open mode / endianness
-        mode_tokens = open_mode.split(":")
-        if len(mode_tokens) != 2:
-            raise ArgumentError("Invalid stream openmode")
-
-        self._open_mode = mode_tokens[0]
-        self._endian = mode_tokens[1]
-
-        # Force binary mode
-        if self._open_mode[-1] != "b":
-            self._open_mode += "b"
-
-        if self._open_mode not in ("rb", "wb", "xb"):
-            raise ValueError("Invalid stream openmode")
+        """Closes the stream"""
+        if self.__file:
+            self.__file.close()
+            self.__file = None
 
 
 class BufferStream(Stream):
-    """Byte-buffer file stream (read+write)
-    """
+    """Byte-buffer file stream"""
 
-    def __init__(self, endian: str, buffer: bytes | bytearray = None):
+    def __init__(self, endian: Endian, buffer: ByteBuffer = None):
         """Constructor
 
         Args:
-            endian (str): Endianness string ('<' for little endian or '>' for big endian)
-            buffer (bytes | bytearray, optional): Byte buffer to read from. If you want to
-                                                  build a buffer, use None. Defaults to None.
+            endian (Endian): Stream endianness
+            buffer (ByteBuffer, optional): Byte buffer to read from. If you want to
+                                           build a buffer, use None. Defaults to None.
 
         Raises:
             ArgumentError: Invalid argument(s) provided
         """
         super().__init__(endian)
 
-        self._buffer = None
+        self.__buffer: bytearray = None
+        self.__position: int = 0
+
         self.open(buffer, endian)
 
     @override
@@ -673,43 +691,39 @@ class BufferStream(Stream):
         Raises:
             OperationError: Stream is not open
             EOFError: Stream has hit the end-of-file (EOF)
-            OperationError: Stream is write-only
         """
-        if self._buffer == None:
+        if self.__buffer is None:
             raise OperationError("No buffer is open")
         if self.eof():
             raise EOFError("Hit end of the buffer")
 
         # -1 size means read until EOF
         if size == -1:
-            size = self.length() - self._position
-
+            size = self.length() - self.__position
         # Don't read past EOF
-        if self._position + size >= self.length():
-            data = self._buffer[self._position:]
-            self._position = self.length()
         else:
-            data = self._buffer[self._position: self._position + size]
-            self._position += size
+            size = min(size, self.length() - self.__position)
+
+        data = self.__buffer[self.__position : self.__position + size]
+        self.__position += size
 
         return data
 
     @override
-    def write(self, data: bytes | bytearray) -> None:
+    def write(self, data: ByteBuffer) -> None:
         """Writes bytes to the stream
 
         Args:
-            data (bytes | bytearray): Data to write
+            data (ByteBuffer): Data to write
 
         Raises:
             OperationError: Stream is not open
-            OperationError: Stream is read-only
         """
-        if self._buffer == None:
+        if self.__buffer is None:
             raise OperationError("No buffer is open")
 
-        self._buffer[self._position: self._position + len(data)] = data
-        self._position += len(data)
+        self.__buffer[self.__position : self.__position + len(data)] = data
+        self.__position += len(data)
 
     @override
     def eof(self) -> bool:
@@ -721,30 +735,43 @@ class BufferStream(Stream):
         Raises:
             OperationError: Stream is not open
         """
-        if self._buffer == None:
+        if self.__buffer is None:
             raise OperationError("No buffer is open")
 
-        return self._position >= self.length()
+        return self.__position >= self.length()
 
     @override
-    def seek(self, origin: SeekDir, offset: int) -> None:
+    def seek(self, origin: SeekDir, offset: int = 0) -> None:
         """Seeks the stream position
 
         Args:
             origin (SeekDir): Seek origin point
-            offset (int): Seek distance
+            offset (int, optional): Seek distance. Defaults to zero.
 
         Raises:
+            ArgumentError: Invalid argument(s) provided
             OperationError: Stream is not open
         """
-        if self._buffer == None:
+        if origin not in SeekDir:
+            raise ArgumentError("Invalid SeekDir")
+        if self.__buffer is None:
             raise OperationError("No buffer is open")
 
-        self._position = {
-            SeekDir.BEGIN: offset,
-            SeekDir.CURRENT: self._position + offset,
-            SeekDir.END: self.length() + offset
-        }[origin]
+        match origin:
+            case SeekDir.BEGIN:
+                if offset < 0:
+                    raise ArgumentError("Invalid seek offset from begin")
+
+                self.__position = offset
+
+            case SeekDir.CURRENT:
+                self.__position += offset
+
+            case SeekDir.END:
+                if offset > 0:
+                    raise ArgumentError("Invalid seek offset from end")
+
+                self.__position = self.length() + offset
 
     @override
     def tell(self) -> int:
@@ -756,10 +783,10 @@ class BufferStream(Stream):
         Raises:
             OperationError: Stream is not open
         """
-        if self._buffer == None:
+        if self.__buffer is None:
             raise OperationError("No buffer is open")
 
-        return self._position
+        return self.__position
 
     @override
     def align(self, alignment: int) -> None:
@@ -775,7 +802,7 @@ class BufferStream(Stream):
         """
         if alignment < 0:
             raise ArgumentError("Invalid alignment")
-        if self._buffer == None:
+        if self.__buffer is None:
             raise OperationError("No buffer is open")
 
         remain = Util.align(self.tell(), alignment) - self.tell()
@@ -794,46 +821,47 @@ class BufferStream(Stream):
         Returns:
             int: Stream length
         """
-        if self._buffer == None:
+        if self.__buffer is None:
             raise OperationError("No buffer is open")
 
-        return len(self._buffer)
+        return len(self.__buffer)
 
-    def open(self, buffer: bytes | bytearray, endian: str) -> None:
+    def open(self, buffer: ByteBuffer, endian: Endian) -> None:
         """Opens the specified byte buffer
 
         Args:
-            buffer (bytes | bytearray, optional): Byte buffer to read from. If you want to
-                                                  build a buffer, use None. Defaults to None.
-            endian (str): Endianness string ('<' for little endian or '>' for big endian)
+            buffer (ByteBuffer, optional): Byte buffer to read from. If you want to
+                                           build a buffer, use None. Defaults to None.
+            endian (Endian): Stream endianness
         """
-        self._buffer = buffer
         self._endian = endian
-        self._position = 0
 
-        if not self._buffer:
-            self._buffer = bytearray()
+        self.__buffer = buffer
+        self.__position = 0
 
-        if isinstance(self._buffer, bytes):
-            self._buffer = bytearray(self._buffer)
+        if self.__buffer is None:
+            # Create empty buffer for building
+            self.__buffer = bytearray()
+        elif isinstance(self.__buffer, bytes):
+            # Convert bytes to mutable bytearray
+            self.__buffer = bytearray(self.__buffer)
 
     @override
     def close(self) -> None:
-        """Closes the stream
-        """
-        self._buffer = None
-        self._position = 0
+        """Closes the stream"""
+        self.__buffer = None
+        self.__position = 0
 
-    def result(self) -> bytes | bytearray:
+    def get(self) -> ByteBuffer:
         """Accesses the built buffer (read-only)
 
         Returns:
-            bytes | bytearray: Resulting buffer
+            ByteBuffer: Resulting buffer
 
         Raises:
             OperationError: Stream is not open
         """
-        if self._buffer == None:
+        if self.__buffer is None:
             raise OperationError("No buffer is open")
 
-        return self._buffer
+        return self.__buffer

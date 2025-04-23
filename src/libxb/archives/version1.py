@@ -1,4 +1,4 @@
-from .archive import XBArchive
+from .common import XBArchive
 
 
 class XBArchiveVer1(XBArchive):

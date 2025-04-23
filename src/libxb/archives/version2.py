@@ -1,17 +1,18 @@
 from enum import IntEnum, unique
 from typing import override
 
-from .archive import XBArchive, XBCompression, XBFile
-from .compress import ClapHanzDeflate, ClapHanzHuffman, ClapHanzLZS
-from .exceptions import (
+from ..core.compress import ClapHanzDeflate, ClapHanzHuffman, ClapHanzLZS
+from ..core.exceptions import (
     ArchiveError,
+    ArgumentError,
     BadArchiveError,
     DecompressionError,
     NotAnArchiveError,
     OperationError,
 )
-from .streams import BufferStream, SeekDir
-from .utils import Util
+from ..core.streams import BufferStream, SeekDir
+from ..core.utils import Util
+from .common import XBArchive, XBCompression, XBEndian, XBFile, XBOpenMode
 
 
 @unique
@@ -30,13 +31,14 @@ class XBArchiveVer2(XBArchive):
     # File "magic" / "signature"
     SIGNATURE = b"\x78\x65\x00\x01"  # "xe.."
 
-    def __init__(self, path: str, open_mode: str):
+    def __init__(self, path: str, mode: XBOpenMode, endian: XBEndian):
         """Constructor
 
         Args:
             path (str): File path to open
-            open_mode (str): Open mode string: "r" (read) / "w" (write) / "x" (create),
-                             followed by ':', and '<' for little endian or '>' for big endian.
+            mode (XBOpenMode): File open mode
+            endian (XBEndian): File endianness
+
 
         Raises:
             ArgumentError: Invalid argument(s) provided
@@ -44,15 +46,33 @@ class XBArchiveVer2(XBArchive):
             ArchiveExistsError: Archive file already exists
             BadArchiveError: Archive file is broken or corrupted
         """
-        super().__init__(path, open_mode)
+        super().__init__(path, mode, endian)
+
+    @override
+    def open(self, path: str, mode: XBOpenMode, endian: XBEndian) -> None:
+        """Opens an version 2 XB archive
+
+        Args:
+            path (str): File path to open
+            mode (XBOpenMode): File open mode
+            endian (XBEndian): File endianness
+
+        Raises:
+            ArgumentError: Invalid argument(s) provided
+        """
+        if mode not in XBOpenMode:
+            raise ArgumentError("Invalid XBOpenMode")
+        if endian not in XBEndian:
+            raise ArgumentError("Invalid XBEndian")
 
         self.__file_num: int = 0
-        self.__files_compress: list[bytes] = []
 
         self.__header_work: BufferStream = None
         self.__fst_work: BufferStream = None
         self.__strtab_work: BufferStream = None
-        self.__files_work: BufferStream = None
+        self.__files_work: list[bytes] = []
+
+        super().open(path, mode, endian)
 
     @override
     def _read(self):
@@ -70,10 +90,13 @@ class XBArchiveVer2(XBArchive):
     def _write(self):
         """Serializes the archive's data"""
         self.__prepare_write()
-        self._strm.write(self.__header_work.result())
-        self._strm.write(self.__fst_work.result())
-        self._strm.write(self.__strtab_work.result())
-        self._strm.write(self.__files_work.result())
+
+        self._strm.write(self.__header_work.get())
+        self._strm.write(self.__fst_work.get())
+        self._strm.write(self.__strtab_work.get())
+
+        for file in self.__files_work:
+            self._strm.write(file)
 
     def __read_header(self) -> None:
         """Reads the header section of the archive
@@ -174,11 +197,11 @@ class XBArchiveVer2(XBArchive):
                     case XBCompression.NONE:
                         data = self._strm.read(entry.length)
                     case XBCompression.LZS:
-                        data = ClapHanzLZS.decompress(self._strm).result()
+                        data = ClapHanzLZS.decompress(self._strm).get()
                     case XBCompression.HUFFMAN:
-                        data = ClapHanzHuffman.decompress(self._strm).result()
+                        data = ClapHanzHuffman.decompress(self._strm).get()
                     case XBCompression.DEFLATE:
-                        data = ClapHanzDeflate.decompress(self._strm).result()
+                        data = ClapHanzDeflate.decompress(self._strm).get()
             except DecompressionError:
                 raise BadArchiveError("Compressed data is broken")
 
@@ -195,7 +218,6 @@ class XBArchiveVer2(XBArchive):
         # Sections are aligned to 4-byte boundary
         assert self.__header_work.length() % 4 == 0
         assert self.__strtab_work.length() % 4 == 0
-        assert self.__files_work.length() % 4 == 0
         assert self.__fst_work.length() % 4 == 0
 
     def __build_header(self) -> None:
@@ -236,7 +258,7 @@ class XBArchiveVer2(XBArchive):
 
         for index, file in enumerate(self._files):
             expand_size = len(file.data)
-            compress_size = len(self.__files_compress[index])
+            compress_size = len(self.__files_work[index])
 
             # Offset is limited by bit size
             if (offset // 4) & ~0xFFFFFFF:
@@ -266,8 +288,8 @@ class XBArchiveVer2(XBArchive):
             self.__strtab_work.write_string(entry.value)
 
         # String table is LZS compressed
-        self.__strtab_work.seek(SeekDir.BEGIN, 0)
-        data = ClapHanzLZS.compress(self.__strtab_work).result()
+        self.__strtab_work.seek(SeekDir.BEGIN)
+        data = ClapHanzLZS.compress(self.__strtab_work).get()
 
         # Only compress the string table if it saves space
         if len(data) < self.__strtab_work.length():
@@ -279,8 +301,6 @@ class XBArchiveVer2(XBArchive):
 
     def __build_file_data(self) -> None:
         """Prepares the archive file data for writing"""
-        self.__files_work = BufferStream(self.endian)
-
         for file in self._files:
             strm = BufferStream(self.endian, file.data)
 
@@ -288,12 +308,12 @@ class XBArchiveVer2(XBArchive):
                 case XBCompression.NONE:
                     data = file.data
                 case XBCompression.LZS:
-                    data = ClapHanzLZS.compress(strm).result()
+                    data = ClapHanzLZS.compress(strm).get()
                 case XBCompression.HUFFMAN:
-                    data = ClapHanzHuffman.compress(strm).result()
+                    data = ClapHanzHuffman.compress(strm).get()
                 case XBCompression.DEFLATE:
-                    data = ClapHanzDeflate.compress(strm).result()
+                    data = ClapHanzDeflate.compress(strm).get()
 
             # Files are aligned to 4-byte boundaries
-            self.__files_work.write(data)
-            Util.align(self.__files_work, 4)
+            Util.align(data, 4)
+            self.__files_work.append(data)
