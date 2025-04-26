@@ -1,10 +1,11 @@
 from abc import ABC, abstractmethod
+from contextlib import suppress
 from dataclasses import dataclass
 from enum import IntFlag, auto
 from typing import override
 
 from .exceptions import ArgumentError, DecompressionError
-from .streams import BufferStream, SeekDir, Stream
+from .streams import BufferStream, Endian, SeekDir, Stream
 
 
 class CompressionStrategy(ABC):
@@ -238,11 +239,29 @@ class ClapHanzHuffman(CompressionStrategy):
         bit_num = 0
         bit_strm = 0
 
+        # Some data is not compressed correctly, and the bitstream read will
+        # cause an out of bounds access. ClapHanz's decompression code does
+        # not check for this and will cause UB.
+        #
+        # In practice, memory is zeroed out past the end of the buffer, so
+        # the data isn't garbage. We have to emulate this with streams.
+        def next_bits() -> int:
+            b0, b1 = 0, 0
+
+            with suppress(EOFError):
+                b0, b1 = strm.read_u8(), strm.read_u8()
+
+            match strm.endian:
+                case Endian.LITTLE:
+                    return b1 << 8 | b0
+                case Endian.BIG:
+                    return b0 << 8 | b1
+
         try:
             while output.length() < expand_size:
                 # Read Huffman code and find the table entry
                 if bit_num < cls.MAX_DEPTH:
-                    bit_strm |= strm.read_u16() << bit_num
+                    bit_strm |= next_bits() << bit_num
                     bit_num += 16
 
                 index = bit_strm & (cls.TABLE_SIZE - 1)
@@ -261,11 +280,11 @@ class ClapHanzHuffman(CompressionStrategy):
 
                     # Refresh stream if needed
                     if bit_num < 16:
-                        bit_strm |= strm.read_u16() << bit_num
+                        bit_strm |= next_bits() << bit_num
                         bit_num += 16
 
                     # Consume one byte (8 bits)
-                    output.write_u8(bit_strm & 0xFF)
+                    output.write_u8(bit_strm)
                     bit_strm >>= 8
                     bit_num -= 8
         except IndexError:
