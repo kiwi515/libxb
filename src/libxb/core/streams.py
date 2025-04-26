@@ -395,6 +395,7 @@ class Stream(AbstractContextManager):
             Endian.BIG: "big",
         }[self._endian]
 
+        value &= (2 ** (size * 8)) - 1
         return int.to_bytes(value, length=size, byteorder=endian, signed=signed)
 
     def __bytes2int(self, data: bytes, signed: bool) -> int:
