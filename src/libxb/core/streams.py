@@ -279,21 +279,21 @@ class Stream(AbstractContextManager):
         Returns:
             str: UTF-8 string
         """
-        string = ""
         i = 0
+        data = bytearray()
 
         while i < maxlen or maxlen == -1:
             if self.eof():
                 break
 
-            data = self.read(1)
-            if data[0] == 0x00:
+            c = self.read(1)
+            if c[0] == 0x00:
                 break
 
-            string += data.decode("utf-8")
+            data += c
             i += 1
 
-        return string
+        return data.decode("utf-8")
 
     def write_string(
         self, string: str, maxlen: int = -1, terminate: bool = True
@@ -327,21 +327,21 @@ class Stream(AbstractContextManager):
         Returns:
             str: UTF-16 string
         """
-        string = ""
         i = 0
+        data = bytearray()
 
         while i < maxlen or maxlen == -1:
             if self.eof():
                 break
 
-            data = self.read(2)
-            if data[0] == 0x00 and data[1] == 0x00:
+            c = self.read(2)
+            if c[0] == 0x00 and c[1] == 0x00:
                 break
 
-            string += data.decode("utf-16")
+            data += c
             i += 1
 
-        return string
+        return data.decode("utf-16")
 
     def write_wstring(
         self, string: str, maxlen: int = -1, terminate: bool = True
@@ -364,6 +364,54 @@ class Stream(AbstractContextManager):
 
         if terminate:
             self.write_u16(0x0000)
+
+    def read_sjis_string(self, maxlen: int = -1) -> str:
+        """Reads a Shift-JIS string from the stream
+
+        Args:
+            maxlen (int, optional): Maximum number of characters to read.
+                                    Defaults to -1 (go until null terminator or end-of-file).
+
+        Returns:
+            str: Shift-JIS string
+        """
+        i = 0
+        data = bytearray()
+
+        while i < maxlen or maxlen == -1:
+            if self.eof():
+                break
+
+            c = self.read(1)
+            if c[0] == 0x00:
+                break
+
+            data += c
+            i += 1
+
+        return data.decode("shift-jis")
+
+    def write_sjis_string(
+        self, string: str, maxlen: int = -1, terminate: bool = True
+    ) -> None:
+        """Writes a Shift-JIS string to the stream
+
+        Args:
+            string (str): String value
+            maxlen (int, optional): Maximum number of characters to write.
+                                    Defaults to -1 (write the whole string).
+            terminate (bool, optional): Whether to null terminate the string. Defaults to True.
+        """
+        # Truncate if string is too long
+        if maxlen >= 0:
+            # Reserve last space for null terminator
+            term_size = 1 if terminate else 0
+            string = string[: maxlen - term_size]
+
+        self.write(string.encode("shift-jis"))
+
+        if terminate:
+            self.write_u8(0x00)
 
     def write_padding(self, size: int) -> None:
         """Writes padding (zero bytes) to the stream.

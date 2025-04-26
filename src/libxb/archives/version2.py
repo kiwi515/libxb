@@ -170,10 +170,10 @@ class XBArchiveVer2(XBArchive):
                 length = strtab_strm.read_u8()
                 hash = strtab_strm.read_u8()
 
-                value = strtab_strm.read_string()
+                value = strtab_strm.read_sjis_string()
                 entry = self.StringTableEntry(value)
 
-                if length != len(value) or hash != entry.hash():
+                if length != entry.length() or hash != entry.hash():
                     raise BadArchiveError("String table is broken")
 
                 self._strtab.append(entry)
@@ -285,7 +285,7 @@ class XBArchiveVer2(XBArchive):
 
             self.__strtab_work.write_u8(len(entry.value))
             self.__strtab_work.write_u8(entry.hash())
-            self.__strtab_work.write_string(entry.value)
+            self.__strtab_work.write_sjis_string(entry.value)
 
         # String table is LZS compressed
         self.__strtab_work.seek(SeekDir.BEGIN)

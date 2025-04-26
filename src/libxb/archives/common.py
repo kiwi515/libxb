@@ -11,7 +11,7 @@ from ..core.exceptions import (
     ArchiveNotFoundError,
     ArgumentError,
 )
-from ..core.streams import Endian, FileStream, OpenMode
+from ..core.streams import BufferStream, Endian, FileStream, OpenMode
 
 XBEndian: TypeAlias = Endian
 XBOpenMode: TypeAlias = OpenMode
@@ -91,6 +91,15 @@ class XBArchive(AbstractContextManager):
                 value (str): String value
             """
             self.value: str = value
+            self.__data: bytes = value.encode("shift-jis")
+
+        def length(self) -> int:
+            """Returns the length of the string, in bytes
+
+            Returns:
+                int: String length (excluding null terminator)
+            """
+            return len(self.__data)
 
         def hash(self) -> int:
             """Calculates the 8-bit hash value of the string
@@ -100,8 +109,8 @@ class XBArchive(AbstractContextManager):
             """
             hash = 0
 
-            for c in self.value:
-                hash = ((hash & 0x7F) << 1 | (hash & 0x80) >> 7) ^ ord(c)
+            for c in self.__data:
+                hash = ((hash & 0x7F) << 1 | (hash & 0x80) >> 7) ^ c
 
             return hash & 0xFF
 
