@@ -230,11 +230,13 @@ class XBArchive(AbstractContextManager):
         # Process all files in directory
         if isdir(path):
             for wpath, _, wfiles in walk(path):
-                if xb_path:
-                    wpath = wpath.replace(path, xb_path)
-
                 for file in wfiles:
-                    self.add(join(wpath, file), xb_path, compression, recursive)
+                    self.add(
+                        join(wpath, file),
+                        join(xb_path, file),
+                        compression,
+                        recursive,
+                    )
 
                 if not recursive:
                     break

@@ -1,5 +1,5 @@
 from .archives.common import XBCompression, XBEndian, XBFile, XBOpenMode
-from .archives.presets import MNGPArchive
+from .archives.presets import MNG5Archive, MNGPArchive
 from .core.exceptions import (
     ArchiveError,
     ArchiveExistsError,
