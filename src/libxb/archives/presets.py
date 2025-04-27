@@ -15,6 +15,19 @@ class MNG3Archive(XBArchiveVer2):
         super().__init__(path, XBOpenMode(mode), XBEndian.LITTLE)
 
 
+class MNG4Archive(XBArchiveVer2):
+    """XB archive for Minna no Golf 4 / Hot Shots Golf Fore!"""
+
+    def __init__(self, path: str, mode: str):
+        """Constructor
+
+        Args:
+            path (str): File path to open
+            mode (str): File open mode ('r'/'w'/'+'/'x')
+        """
+        super().__init__(path, XBOpenMode(mode), XBEndian.LITTLE)
+
+
 class MNGPArchive(XBArchiveVer2):
     """XB archive for the Minna no Golf Portable / Hot Shots Golf: Open Tee games"""
 
