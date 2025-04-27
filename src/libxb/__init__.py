@@ -1,4 +1,5 @@
 from .archives.common import XBCompression, XBEndian, XBFile, XBOpenMode
+from .archives.implement import XBArchive
 from .archives.presets import (
     MNG3Archive,
     MNG4Archive,

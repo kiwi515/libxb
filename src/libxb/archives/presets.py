@@ -1,8 +1,8 @@
 from .common import XBEndian, XBOpenMode
-from .version2 import XBArchiveVer2
+from .implement import XBArchive
 
 
-class MNG3Archive(XBArchiveVer2):
+class MNG3Archive(XBArchive):
     """XB archive for Minna no Golf 3 / Hot Shots Golf 3"""
 
     def __init__(self, path: str, mode: str):
@@ -15,7 +15,7 @@ class MNG3Archive(XBArchiveVer2):
         super().__init__(path, XBOpenMode(mode), XBEndian.LITTLE)
 
 
-class MNG4Archive(XBArchiveVer2):
+class MNG4Archive(XBArchive):
     """XB archive for Minna no Golf 4 / Hot Shots Golf Fore!"""
 
     def __init__(self, path: str, mode: str):
@@ -28,7 +28,7 @@ class MNG4Archive(XBArchiveVer2):
         super().__init__(path, XBOpenMode(mode), XBEndian.LITTLE)
 
 
-class MNGPArchive(XBArchiveVer2):
+class MNGPArchive(XBArchive):
     """XB archive for the Minna no Golf Portable / Hot Shots Golf: Open Tee games"""
 
     def __init__(self, path: str, mode: str):
@@ -41,7 +41,7 @@ class MNGPArchive(XBArchiveVer2):
         super().__init__(path, XBOpenMode(mode), XBEndian.LITTLE)
 
 
-class MNG5Archive(XBArchiveVer2):
+class MNG5Archive(XBArchive):
     """XB archive for Minna no Golf 5 / Hot Shots Golf: Out of Bounds"""
 
     def __init__(self, path: str, mode: str):
@@ -54,7 +54,7 @@ class MNG5Archive(XBArchiveVer2):
         super().__init__(path, XBOpenMode(mode), XBEndian.BIG)
 
 
-class MNTArchive(XBArchiveVer2):
+class MNTArchive(XBArchive):
     """XB archive for Minna no Tennis / Hot Shots Tennis"""
 
     def __init__(self, path: str, mode: str):
@@ -67,7 +67,7 @@ class MNTArchive(XBArchiveVer2):
         super().__init__(path, XBOpenMode(mode), XBEndian.LITTLE)
 
 
-class MNTPArchive(XBArchiveVer2):
+class MNTPArchive(XBArchive):
     """XB archive for Minna no Tennis Portable / Hot Shots Tennis: Get A Grip"""
 
     def __init__(self, path: str, mode: str):

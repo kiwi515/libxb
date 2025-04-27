@@ -11,7 +11,7 @@ from ..core.exceptions import (
     ArchiveNotFoundError,
     ArgumentError,
 )
-from ..core.streams import BufferStream, Endian, FileStream, OpenMode
+from ..core.streams import Endian, FileStream, OpenMode
 
 XBEndian: TypeAlias = Endian
 XBOpenMode: TypeAlias = OpenMode
@@ -51,9 +51,9 @@ class XBFile:
         self.compression: XBCompression = compression
 
 
-class XBArchive(AbstractContextManager):
-    """Generic read/write support for XB archives (.XB file format).
-    Subclasses implement concepts which differ between revisions of the XB format.
+class XBArchiveBase(AbstractContextManager):
+    """Generic interface for XB archives (.XB file format).
+    Subclasses implement concepts which may differ between revisions of the XB format.
     """
 
     class FileSystemEntry:
@@ -175,8 +175,8 @@ class XBArchive(AbstractContextManager):
         self._strm: FileStream = None
         self._files: list[XBFile] = []
 
-        self._fst: list[XBArchive.FileSystemEntry] = []
-        self._strtab: list[XBArchive.StringTableEntry] = []
+        self._fst: list[XBArchiveBase.FileSystemEntry] = []
+        self._strtab: list[XBArchiveBase.StringTableEntry] = []
 
         try:
             self._strm = FileStream(path, mode, endian)

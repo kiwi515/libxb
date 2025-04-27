@@ -12,12 +12,12 @@ from ..core.exceptions import (
 )
 from ..core.streams import BufferStream, SeekDir
 from ..core.utils import Util
-from .common import XBArchive, XBCompression, XBEndian, XBFile, XBOpenMode
+from .common import XBArchiveBase, XBCompression, XBEndian, XBFile, XBOpenMode
 
 
 @unique
-class XBCompressionVer2(IntEnum):
-    """Version 2 XB file compression strategy"""
+class XBCompressionImpl(IntEnum):
+    """Binary form of XB file compression strategy"""
 
     DEFLATE = 0  # LZS + Huffman
     HUFFMAN = 1  # Huffman
@@ -25,8 +25,8 @@ class XBCompressionVer2(IntEnum):
     NONE = 3  # Uncompressed
 
 
-class XBArchiveVer2(XBArchive):
-    """Read/write support for version 2 XB archives"""
+class XBArchive(XBArchiveBase):
+    """XB archive implementation"""
 
     # File "magic" / "signature"
     SIGNATURE = b"\x78\x65\x00\x01"  # "xe.."
@@ -50,7 +50,7 @@ class XBArchiveVer2(XBArchive):
 
     @override
     def open(self, path: str, mode: XBOpenMode, endian: XBEndian) -> None:
-        """Opens an version 2 XB archive
+        """Opens an XB archive
 
         Args:
             path (str): File path to open
@@ -125,7 +125,7 @@ class XBArchiveVer2(XBArchive):
 
             # Compression/offset are packed as one 32-bit value
             # cccc oooo oooo oooo oooo oooo oooo oooo
-            compression = XBCompressionVer2(cmpoff >> 28)
+            compression = XBCompressionImpl(cmpoff >> 28)
             offset = cmpoff & 0x0FFFFFFF
 
             # Offset is stored divided by 4 so all values are expressable
@@ -268,7 +268,7 @@ class XBArchiveVer2(XBArchive):
 
             # Compression/offset are packed as one 32-bit value
             # cccc oooo oooo oooo oooo oooo oooo oooo
-            compression = Util.convert_enum(file.compression, XBCompressionVer2)
+            compression = Util.convert_enum(file.compression, XBCompressionImpl)
             cmpoff = (compression & 0b1111) << 28 | (offset // 4)
 
             self.__fst_work.write_u32(expand_size)
