@@ -2,6 +2,19 @@ from .common import XBEndian, XBOpenMode
 from .version2 import XBArchiveVer2
 
 
+class MNG3Archive(XBArchiveVer2):
+    """XB archive for Minna no Golf 3 / Hot Shots Golf 3"""
+
+    def __init__(self, path: str, mode: str):
+        """Constructor
+
+        Args:
+            path (str): File path to open
+            mode (str): File open mode ('r'/'w'/'+'/'x')
+        """
+        super().__init__(path, XBOpenMode(mode), XBEndian.LITTLE)
+
+
 class MNGPArchive(XBArchiveVer2):
     """XB archive for the Minna no Golf Portable / Hot Shots Golf: Open Tee games"""
 
