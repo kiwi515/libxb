@@ -117,8 +117,11 @@ class ClapHanzLZS(CompressionStrategy):
 
         if expand_size == 0:
             raise ArgumentError("Invalid decompressed size")
+
+        # File was marked for compression but wasn't actually compressed.
+        # Seems like the ClapHanz tools omit compression if it would have wasted space.
         if compress_size == 0:
-            raise DecompressionError("Data is not compressed")
+            return BufferStream(strm.endian, strm.read(expand_size))
 
         output = bytearray(expand_size)
         out_idx = 0
@@ -225,8 +228,11 @@ class ClapHanzHuffman(CompressionStrategy):
 
         if expand_size == 0:
             raise ArgumentError("Invalid decompressed size")
+
+        # File was marked for compression but wasn't actually compressed.
+        # Seems like the ClapHanz tools omit compression if it would have wasted space.
         if compress_size == 0:
-            raise DecompressionError("Data is not compressed")
+            return BufferStream(strm.endian, strm.read(expand_size))
 
         # Build the Huffman decoding table
         try:

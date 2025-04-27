@@ -151,7 +151,7 @@ class XBArchiveVer2(XBArchive):
         compress_size = self._strm.read_u32()
 
         # String table is *sometimes* LZS compressed.
-        # Seems like the ClapHanz tools omit compression if it would waste space.
+        # Seems like the ClapHanz tools omit compression if it would have wasted space.
         if compress_size != 0:
             try:
                 strtab_strm = ClapHanzLZS.decompress(
