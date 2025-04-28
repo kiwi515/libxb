@@ -941,10 +941,3 @@ class BufferStream(Stream):
             raise OperationError("No buffer is open")
 
         return self.__buffer
-
-
-class BufferStreamView(BufferStream):
-    """Read-only view of an existing BufferStream"""
-
-    def __init__(self, strm: BufferStream):
-        super().__init__(OpenMode.READ, strm.endian, strm.get())
