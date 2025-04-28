@@ -123,20 +123,17 @@ class ClapHanzLZS(CompressionStrategy):
         if compress_size == 0:
             return BufferStream(strm.endian, strm.read(expand_size))
 
-        output = bytearray(expand_size)
-        out_idx = 0
+        output = bytearray()
 
         try:
-            while out_idx < expand_size:
+            while len(output) < expand_size:
                 code = strm.read_u8()
 
                 # Literal copy
                 if (code & cls.ChunkFlag.MASK) == cls.ChunkFlag.LITERAL:
                     copy_len = (code >> 2) + 1
+                    output += strm.read(copy_len)
 
-                    for _ in range(copy_len):
-                        output[out_idx] = strm.read_u8()
-                        out_idx += 1
                 # Run decode
                 else:
                     run_offset = 0
@@ -159,11 +156,11 @@ class ClapHanzLZS(CompressionStrategy):
                         run_offset = value >> 12
 
                     # Copy block
-                    run_idx = out_idx - run_offset
+                    run_idx = len(output) - run_offset
                     for _ in range(run_len):
-                        output[out_idx] = output[run_idx]
-                        out_idx += 1
+                        output.append(output[run_idx])
                         run_idx += 1
+
         except IndexError:
             raise DecompressionError("Compressed data is malformed")
         except EOFError:
@@ -240,7 +237,8 @@ class ClapHanzHuffman(CompressionStrategy):
         except (IndexError, EOFError):
             raise DecompressionError("Failed to create Huffman table")
 
-        output = BufferStream(strm.endian)
+        output = bytearray(expand_size)
+        out_idx = 0
 
         bit_num = 0
         bit_strm = 0
@@ -264,7 +262,7 @@ class ClapHanzHuffman(CompressionStrategy):
                     return b0 << 8 | b1
 
         try:
-            while output.length() < expand_size:
+            while out_idx < expand_size:
                 # Read Huffman code and find the table entry
                 if bit_num < cls.MAX_DEPTH:
                     bit_strm |= next_bits() << bit_num
@@ -276,7 +274,9 @@ class ClapHanzHuffman(CompressionStrategy):
                 # Huffman symbol
                 if entry.length <= cls.MAX_DEPTH:
                     # Consume bits based on the symbol length
-                    output.write_u8(entry.symbol)
+                    output[out_idx] = entry.symbol & 0xFF
+                    out_idx += 1
+
                     bit_strm >>= entry.length
                     bit_num -= entry.length
                 # Literal byte
@@ -290,7 +290,9 @@ class ClapHanzHuffman(CompressionStrategy):
                         bit_num += 16
 
                     # Consume one byte (8 bits)
-                    output.write_u8(bit_strm)
+                    output[out_idx] = bit_strm & 0xFF
+                    out_idx += 1
+
                     bit_strm >>= 8
                     bit_num -= 8
         except IndexError:
@@ -298,8 +300,7 @@ class ClapHanzHuffman(CompressionStrategy):
         except EOFError:
             raise DecompressionError("Hit the end-of-file while decompressing")
 
-        output.seek(SeekDir.BEGIN)
-        return output
+        return BufferStream(strm.endian, output)
 
     @classmethod
     def _rebuild_huffman_table(cls, strm: Stream) -> list[Symbol]:
