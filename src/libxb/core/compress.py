@@ -1,11 +1,10 @@
 from abc import ABC, abstractmethod
-from contextlib import suppress
 from dataclasses import dataclass
 from enum import IntFlag, auto
 from typing import override
 
 from .exceptions import ArgumentError, DecompressionError
-from .streams import BufferStream, Endian, SeekDir, Stream
+from .streams import BufferStream, SeekDir, Stream
 
 
 class CompressionStrategy(ABC):
@@ -130,7 +129,7 @@ class ClapHanzLZS(CompressionStrategy):
                 code = strm.read_u8()
 
                 # Literal copy
-                if (code & cls.ChunkFlag.MASK) == cls.ChunkFlag.LITERAL:
+                if (code & cls.ChunkFlag.MASK.value) == cls.ChunkFlag.LITERAL:
                     copy_len = (code >> 2) + 1
                     output += strm.read(copy_len)
 
@@ -140,7 +139,7 @@ class ClapHanzLZS(CompressionStrategy):
                     run_len = 0
 
                     # Short-distance run
-                    if code & cls.ChunkFlag.SHORTRUN:
+                    if code & cls.ChunkFlag.SHORTRUN.value:
                         b0 = strm.read_u8()
                         value = b0 << 8 | code
 
@@ -250,16 +249,10 @@ class ClapHanzHuffman(CompressionStrategy):
         # In practice, memory is zeroed out past the end of the buffer, so
         # the data isn't garbage. We have to emulate this with streams.
         def next_bits() -> int:
-            b0, b1 = 0, 0
-
-            with suppress(EOFError):
-                b0, b1 = strm.read_u8(), strm.read_u8()
-
-            match strm.endian:
-                case Endian.LITTLE:
-                    return b1 << 8 | b0
-                case Endian.BIG:
-                    return b0 << 8 | b1
+            try:
+                return strm.read_u16()
+            except EOFError:
+                return 0
 
         try:
             while out_idx < expand_size:
