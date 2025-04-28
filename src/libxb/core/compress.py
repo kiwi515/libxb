@@ -338,10 +338,11 @@ class ClapHanzHuffman(CompressionStrategy):
         # Cache loop invariant attributes
         read_u8 = strm.read_u8
         max_depth = cls.MAX_DEPTH
+        table_size = cls.TABLE_SIZE
         symbol_cls = cls.Symbol
 
         # Table has a fixed size
-        table = [None] * cls.TABLE_SIZE
+        table = [None] * table_size
 
         max_length = read_u8()
         if max_length == 0:
@@ -367,7 +368,7 @@ class ClapHanzHuffman(CompressionStrategy):
                     symbol = read_u8()
 
                     # Duplicate symbols which match the prefix?
-                    while index < len(table):
+                    while index < table_size:
                         table[index] = symbol_cls(length, symbol)
                         index += 1 << length
 

@@ -130,15 +130,6 @@ class Stream(AbstractContextManager):
         raise NotImplementedError()
 
     @abstractmethod
-    def align(self, alignment: int) -> None:
-        """Aligns the stream position to a byte boundary.
-
-        Args:
-            alignment (int): Byte alignment boundary
-        """
-        raise NotImplementedError()
-
-    @abstractmethod
     def length(self) -> int:
         """Retrieves the stream length
 
@@ -146,6 +137,31 @@ class Stream(AbstractContextManager):
             int: Stream length
         """
         raise NotImplementedError()
+
+    def align(self, alignment: int) -> None:
+        """Aligns the stream position to a byte boundary.
+
+        Args:
+            alignment (int): Byte alignment boundary
+
+        Raises:
+            ArgumentError: Invalid argument(s) provided
+            OperationError: Stream is not open
+
+        """
+        if alignment < 0:
+            raise ArgumentError("Invalid alignment")
+
+        pos = self.tell()
+
+        remain = Util.align(pos, alignment) - pos
+        if remain == 0:
+            return
+
+        if self._mode == OpenMode.READ or not self.eof():
+            self.seek(SeekDir.CURRENT, remain)
+        else:
+            self.write_padding(remain)
 
     def close(self) -> None:
         """Closes the stream"""
@@ -157,7 +173,7 @@ class Stream(AbstractContextManager):
         Returns:
             int: Integer value
         """
-        return self.__bytes2int(self.read(1), signed=True)
+        return self.__bytes_to_int(self.read(1), signed=True)
 
     def write_s8(self, value: int) -> None:
         """Writes a signed 8-bit integer to the stream
@@ -165,7 +181,7 @@ class Stream(AbstractContextManager):
         Args:
             data (int): Integer value
         """
-        return self.write(self.__int2bytes(value, size=1, signed=True))
+        return self.write(self.__int_to_bytes(value, size=1, signed=True))
 
     def read_u8(self) -> int:
         """Reads a unsigned 8-bit integer from the stream
@@ -173,7 +189,7 @@ class Stream(AbstractContextManager):
         Returns:
             int: Integer value
         """
-        return self.__bytes2int(self.read(1), signed=False)
+        return self.__bytes_to_int(self.read(1), signed=False)
 
     def write_u8(self, value: int) -> None:
         """Writes a unsigned 8-bit integer to the stream
@@ -181,7 +197,7 @@ class Stream(AbstractContextManager):
         Args:
             value (int): Integer value
         """
-        return self.write(self.__int2bytes(value, size=1, signed=False))
+        return self.write(self.__int_to_bytes(value, size=1, signed=False))
 
     def read_s16(self) -> int:
         """Reads a signed 16-bit integer from the stream
@@ -189,7 +205,7 @@ class Stream(AbstractContextManager):
         Returns:
             int: Integer value
         """
-        return self.__bytes2int(self.read(2), signed=True)
+        return self.__bytes_to_int(self.read(2), signed=True)
 
     def write_s16(self, value: int) -> None:
         """Writes a signed 16-bit integer to the stream
@@ -197,7 +213,7 @@ class Stream(AbstractContextManager):
         Args:
             value (int): Integer value
         """
-        return self.write(self.__int2bytes(value, size=2, signed=True))
+        return self.write(self.__int_to_bytes(value, size=2, signed=True))
 
     def read_u16(self) -> int:
         """Reads a unsigned 16-bit integer from the stream
@@ -205,7 +221,7 @@ class Stream(AbstractContextManager):
         Returns:
             int: Integer value
         """
-        return self.__bytes2int(self.read(2), signed=False)
+        return self.__bytes_to_int(self.read(2), signed=False)
 
     def write_u16(self, value: int) -> None:
         """Writes a unsigned 16-bit integer to the stream
@@ -213,7 +229,7 @@ class Stream(AbstractContextManager):
         Args:
             value (int): Integer value
         """
-        return self.write(self.__int2bytes(value, size=2, signed=False))
+        return self.write(self.__int_to_bytes(value, size=2, signed=False))
 
     def read_s32(self) -> int:
         """Reads a signed 32-bit integer from the stream
@@ -221,7 +237,7 @@ class Stream(AbstractContextManager):
         Returns:
             int: Integer value
         """
-        return self.__bytes2int(self.read(4), signed=True)
+        return self.__bytes_to_int(self.read(4), signed=True)
 
     def write_s32(self, value: int) -> None:
         """Writes a signed 32-bit integer to the stream
@@ -229,7 +245,7 @@ class Stream(AbstractContextManager):
         Args:
             value (int): Integer value
         """
-        return self.write(self.__int2bytes(value, size=4, signed=True))
+        return self.write(self.__int_to_bytes(value, size=4, signed=True))
 
     def read_u32(self) -> int:
         """Reads a unsigned 32-bit integer from the stream
@@ -237,7 +253,7 @@ class Stream(AbstractContextManager):
         Returns:
             int: Integer value
         """
-        return self.__bytes2int(self.read(4), signed=False)
+        return self.__bytes_to_int(self.read(4), signed=False)
 
     def write_u32(self, value: int) -> None:
         """Writes a unsigned 32-bit integer to the stream
@@ -245,7 +261,7 @@ class Stream(AbstractContextManager):
         Args:
             value (int): Integer value
         """
-        return self.write(self.__int2bytes(value, size=4, signed=False))
+        return self.write(self.__int_to_bytes(value, size=4, signed=False))
 
     def read_f32(self) -> float:
         """Reads a single-precision, floating-point value from the stream
@@ -253,7 +269,7 @@ class Stream(AbstractContextManager):
         Returns:
             float: Single-precision, floating-point value
         """
-        return self.__bytes2dec(self.read(4))
+        return self.__bytes_to_dec(self.read(4))
 
     def write_f32(self, value: float) -> None:
         """Writes a single-precision, floating-point value to the stream
@@ -261,7 +277,7 @@ class Stream(AbstractContextManager):
         Args:
             value (float): Single-precision, floating-point value
         """
-        return self.write(self.__dec2bytes(value, size=4))
+        return self.write(self.__dec_to_bytes(value, size=4))
 
     def read_f64(self) -> float:
         """Reads a double-precision, floating-point value from the stream
@@ -269,7 +285,7 @@ class Stream(AbstractContextManager):
         Returns:
             float: Double-precision, floating-point value
         """
-        return self.__bytes2dec(self.read(8))
+        return self.__bytes_to_dec(self.read(8))
 
     def write_f64(self, value: float) -> None:
         """Writes a double-precision, floating-point value to the stream
@@ -277,7 +293,7 @@ class Stream(AbstractContextManager):
         Args:
             value (float): Double-precision, floating-point value
         """
-        return self.write(self.__dec2bytes(value, size=8))
+        return self.write(self.__dec_to_bytes(value, size=8))
 
     def read_string(self, maxlen: int = -1) -> str:
         """Reads a UTF-8 string from the stream
@@ -437,7 +453,7 @@ class Stream(AbstractContextManager):
 
         self.write(bytes([0x00] * size))
 
-    def __int2bytes(self, value: int, size: int, signed: bool) -> bytes:
+    def __int_to_bytes(self, value: int, size: int, signed: bool) -> bytes:
         """Converts an integer value into bytes, based on the stream endianness
 
         Args:
@@ -456,7 +472,7 @@ class Stream(AbstractContextManager):
         value &= (2 ** (size * 8)) - 1
         return int.to_bytes(value, length=size, byteorder=endian, signed=signed)
 
-    def __bytes2int(self, data: bytes, signed: bool) -> int:
+    def __bytes_to_int(self, data: bytes, signed: bool) -> int:
         """Converts bytes into an integer value, based on the stream endianness
 
         Args:
@@ -473,7 +489,7 @@ class Stream(AbstractContextManager):
 
         return int.from_bytes(data, byteorder=endian, signed=signed)
 
-    def __dec2bytes(self, value: float, size: int) -> bytes:
+    def __dec_to_bytes(self, value: float, size: int) -> bytes:
         """Converts a decimal value into bytes, based on the stream endianness
 
         Args:
@@ -488,7 +504,7 @@ class Stream(AbstractContextManager):
         arr = pack(f"{self._endian}{t}", value)
         return bytes(arr)
 
-    def __bytes2dec(self, data: bytes) -> float:
+    def __bytes_to_dec(self, data: bytes) -> float:
         """Converts bytes into a decimal value, based on the stream endianness
 
         Args:
@@ -589,7 +605,7 @@ class FileStream(Stream):
             return True
 
         # Undo read operation
-        self.seek(SeekDir.CURRENT, -1)
+        self.__file.seek(-1, SeekDir.CURRENT)
 
         return False
 
@@ -632,33 +648,6 @@ class FileStream(Stream):
         return self.__file.tell()
 
     @override
-    def align(self, alignment: int) -> None:
-        """Aligns the stream position to a byte boundary.
-
-        Args:
-            alignment (int): Byte alignment boundary
-
-        Raises:
-            ArgumentError: Invalid argument(s) provided
-            OperationError: Stream is not open
-
-        """
-        if alignment < 0:
-            raise ArgumentError("Invalid alignment")
-        if not self.__file:
-            raise OperationError("No file is open")
-
-        remain = Util.align(self.tell(), alignment) - self.tell()
-        if remain == 0:
-            return
-
-        match self._mode:
-            case OpenMode.READ:
-                self.seek(SeekDir.CURRENT, remain)
-            case OpenMode.WRITE | OpenMode.RW | OpenMode.CREATE:
-                self.write_padding(remain)
-
-    @override
     def length(self) -> int:
         """Retrives the stream length
 
@@ -698,9 +687,9 @@ class FileStream(Stream):
         os_mode = f"{self._mode}b"
         self.__file = open(self.__path, os_mode)
 
-        self.seek(SeekDir.END)
+        self.__file.seek(0, SeekDir.END)
         self.__length = self.__file.tell()
-        self.seek(SeekDir.BEGIN)
+        self.__file.seek(0, SeekDir.BEGIN)
 
     @override
     def close(self) -> None:
@@ -753,15 +742,15 @@ class BufferStream(Stream):
             raise OperationError("No buffer is open")
         if self._mode == OpenMode.WRITE:
             raise OperationError("Stream is write-only")
-        if self.eof():
+        if self.__position >= len(self.__buffer):
             raise EOFError("Hit end of the buffer")
 
         # -1 size means read until EOF
         if size == -1:
-            size = self.length() - self.__position
+            size = len(self.__buffer) - self.__position
         # Don't read past EOF
         else:
-            size = min(size, self.length() - self.__position)
+            size = min(size, len(self.__buffer) - self.__position)
 
         data = self.__buffer[self.__position : self.__position + size]
         self.__position += size
@@ -800,7 +789,7 @@ class BufferStream(Stream):
         if self.__buffer is None:
             raise OperationError("No buffer is open")
 
-        return self.__position >= self.length()
+        return self.__position >= len(self.__buffer)
 
     @override
     def seek(self, origin: SeekDir, offset: int = 0) -> None:
@@ -833,7 +822,7 @@ class BufferStream(Stream):
                 if offset > 0:
                     raise ArgumentError("Invalid seek offset from end")
 
-                self.__position = self.length() + offset
+                self.__position = len(self.__buffer) + offset
 
     @override
     def tell(self) -> int:
@@ -849,32 +838,6 @@ class BufferStream(Stream):
             raise OperationError("No buffer is open")
 
         return self.__position
-
-    @override
-    def align(self, alignment: int) -> None:
-        """Aligns the stream position to a byte boundary.
-
-        Args:
-            alignment (int): Byte alignment boundary
-
-        Raises:
-            ArgumentError: Invalid argument(s) provided
-            OperationError: Stream is not open
-
-        """
-        if alignment < 0:
-            raise ArgumentError("Invalid alignment")
-        if self.__buffer is None:
-            raise OperationError("No buffer is open")
-
-        remain = Util.align(self.tell(), alignment) - self.tell()
-        if remain == 0:
-            return
-
-        if self._mode == OpenMode.READ or not self.eof():
-            self.seek(SeekDir.CURRENT, remain)
-        else:
-            self.write_padding(remain)
 
     @override
     def length(self) -> int:
