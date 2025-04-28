@@ -319,7 +319,7 @@ class ClapHanzHuffman(CompressionStrategy):
             list[Symbol]: List of Huffman symbols
         """
         # Table has a fixed size
-        table = [None for _ in range(cls.TABLE_SIZE)]
+        table = [None] * cls.TABLE_SIZE
 
         max_length = strm.read_u8()
         if max_length == 0:
