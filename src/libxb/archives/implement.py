@@ -10,7 +10,7 @@ from ..core.exceptions import (
     NotAnArchiveError,
     OperationError,
 )
-from ..core.streams import BufferStream, SeekDir
+from ..core.streams import BufferStream, OpenMode, SeekDir
 from ..core.utils import Util
 from .common import XBArchiveBase, XBCompression, XBEndian, XBFile, XBOpenMode
 
@@ -161,7 +161,7 @@ class XBArchive(XBArchiveBase):
                 raise BadArchiveError("String table is broken")
         else:
             strtab_strm = BufferStream(
-                self.endian, self._strm.read(expand_size)
+                OpenMode.READ, self.endian, self._strm.read(expand_size)
             )
 
         # Parse the string table
@@ -229,7 +229,7 @@ class XBArchive(XBArchiveBase):
         if len(self._files) > 0xFFFFFFFF:
             raise ArchiveError("Archive contains too many files")
 
-        self.__header_work = BufferStream(self.endian)
+        self.__header_work = BufferStream(OpenMode.RW, self.endian)
 
         self.__header_work.write(self.SIGNATURE)
         self.__header_work.write_u32(len(self._files))
@@ -248,7 +248,7 @@ class XBArchive(XBArchiveBase):
         if not self.__files_work:
             raise OperationError("File data must be built before FST")
 
-        self.__fst_work = BufferStream(self.endian)
+        self.__fst_work = BufferStream(OpenMode.RW, self.endian)
 
         # Calculate the offset of the file data section
         offset = 0
@@ -278,7 +278,7 @@ class XBArchive(XBArchiveBase):
 
     def __build_string_table(self) -> None:
         """Prepares the archive string table (strtab) for writing"""
-        self.__strtab_work = BufferStream(self.endian)
+        self.__strtab_work = BufferStream(OpenMode.RW, self.endian)
 
         for file in self._files:
             entry = self.StringTableEntry(file.path)
@@ -294,7 +294,7 @@ class XBArchive(XBArchiveBase):
         # Only compress the string table if it saves space
         if len(data) < self.__strtab_work.length():
             self.__strtab_work.close()
-            self.__strtab_work = BufferStream(self.endian, data)
+            self.__strtab_work = BufferStream(OpenMode.RW, self.endian, data)
 
         # Sections are aligned to 4-byte boundary
         Util.align(self.__strtab_work, 4)
@@ -302,7 +302,7 @@ class XBArchive(XBArchiveBase):
     def __build_file_data(self) -> None:
         """Prepares the archive file data for writing"""
         for file in self._files:
-            strm = BufferStream(self.endian, file.data)
+            strm = BufferStream(OpenMode.READ, self.endian, file.data)
 
             match file.compression:
                 case XBCompression.NONE:

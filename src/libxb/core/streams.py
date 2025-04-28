@@ -8,7 +8,7 @@ from typing import TypeAlias, override
 from .exceptions import ArgumentError, OperationError
 from .utils import Util
 
-ByteBuffer: TypeAlias = bytes | bytearray
+ByteBuffer: TypeAlias = bytes | bytearray | memoryview
 
 
 @unique
@@ -47,19 +47,29 @@ class Stream(AbstractContextManager):
     Derived classes can be used as context managers ('with' statements).
     """
 
-    def __init__(self, endian: Endian):
+    def __init__(self, mode: OpenMode, endian: Endian):
         """Constructor
 
         Args:
+            mode (OpenMode): Stream access mode
             endian (Endian): Stream endianness
 
         Raises:
+            ArgumentError: Invalid openmode provided
             ArgumentError: Invalid endianness provided
         """
+        if mode not in OpenMode:
+            raise ArgumentError("Invalid openmode")
         if endian not in Endian:
             raise ArgumentError("Invalid endianness")
 
+        self._mode: OpenMode = mode
         self._endian: Endian = endian
+
+    @property
+    def mode(self):
+        """Accesses the stream's openmode (read-only)"""
+        return self._mode
 
     @property
     def endian(self):
@@ -503,10 +513,9 @@ class FileStream(Stream):
             mode (OpenMode): File access mode
             endian (Endian): File endianness
         """
-        super().__init__(endian)
+        super().__init__(mode, endian)
 
         self.__path: str = ""
-        self.__mode: OpenMode = None
         self.__file = None
 
         self.open(path, mode, endian)
@@ -515,11 +524,6 @@ class FileStream(Stream):
     def path(self) -> str:
         """Accesses the streams's filepath (read-only)"""
         return self.__path
-
-    @property
-    def mode(self) -> OpenMode:
-        """Accesses the streams's open mode (read-only)"""
-        return self.__mode
 
     @override
     def read(self, size: int = -1) -> bytes:
@@ -540,7 +544,7 @@ class FileStream(Stream):
             raise OperationError("No file is open")
         if self.eof():
             raise EOFError("Hit end-of-file")
-        if self.__mode not in (OpenMode.READ, OpenMode.RW):
+        if self._mode not in (OpenMode.READ, OpenMode.RW):
             raise OperationError("Stream is write-only")
 
         return self.__file.read(size)
@@ -558,7 +562,7 @@ class FileStream(Stream):
         """
         if not self.__file:
             raise OperationError("No file is open")
-        if self.__mode not in (OpenMode.WRITE, OpenMode.RW, OpenMode.CREATE):
+        if self._mode not in (OpenMode.WRITE, OpenMode.RW, OpenMode.CREATE):
             raise OperationError("Stream is read-only")
 
         self.__file.write(data)
@@ -577,7 +581,7 @@ class FileStream(Stream):
             raise OperationError("No file is open")
 
         # With write permission, you can kinda just do whatever
-        if self.__mode not in (OpenMode.READ, OpenMode.RW):
+        if self._mode not in (OpenMode.READ, OpenMode.RW):
             return False
 
         # Try to peek one byte
@@ -648,7 +652,7 @@ class FileStream(Stream):
         if remain == 0:
             return
 
-        match self.__mode:
+        match self._mode:
             case OpenMode.READ:
                 self.seek(SeekDir.CURRENT, remain)
             case OpenMode.WRITE | OpenMode.RW | OpenMode.CREATE:
@@ -687,11 +691,11 @@ class FileStream(Stream):
             self.close()
 
         self.__path = path
-        self.__mode = mode
+        self._mode = mode
         self._endian = endian
 
         # Force binary mode
-        os_mode = f"{self.__mode}b"
+        os_mode = f"{self._mode}b"
         self.__file = open(self.__path, os_mode)
 
         self.seek(SeekDir.END)
@@ -709,10 +713,13 @@ class FileStream(Stream):
 class BufferStream(Stream):
     """Byte-buffer file stream"""
 
-    def __init__(self, endian: Endian, buffer: ByteBuffer = None):
+    def __init__(
+        self, mode: OpenMode, endian: Endian, buffer: ByteBuffer = None
+    ):
         """Constructor
 
         Args:
+            mode (OpenMode): Stream access mode
             endian (Endian): Stream endianness
             buffer (ByteBuffer, optional): Byte buffer to read from. If you want to
                                            build a buffer, use None. Defaults to None.
@@ -720,12 +727,12 @@ class BufferStream(Stream):
         Raises:
             ArgumentError: Invalid argument(s) provided
         """
-        super().__init__(endian)
+        super().__init__(mode, endian)
 
-        self.__buffer: bytearray = None
+        self.__buffer: ByteBuffer = None
         self.__position: int = 0
 
-        self.open(buffer, endian)
+        self.open(buffer, mode, endian)
 
     @override
     def read(self, size: int = -1) -> bytes:
@@ -739,10 +746,13 @@ class BufferStream(Stream):
 
         Raises:
             OperationError: Stream is not open
+            OperationError: Stream is write-only
             EOFError: Stream has hit the end-of-file (EOF)
         """
         if self.__buffer is None:
             raise OperationError("No buffer is open")
+        if self._mode == OpenMode.WRITE:
+            raise OperationError("Stream is write-only")
         if self.eof():
             raise EOFError("Hit end of the buffer")
 
@@ -767,9 +777,12 @@ class BufferStream(Stream):
 
         Raises:
             OperationError: Stream is not open
+            OperationError: Stream is read-only
         """
         if self.__buffer is None:
             raise OperationError("No buffer is open")
+        if self._mode == OpenMode.READ:
+            raise OperationError("Stream is read-only")
 
         self.__buffer[self.__position : self.__position + len(data)] = data
         self.__position += len(data)
@@ -858,7 +871,7 @@ class BufferStream(Stream):
         if remain == 0:
             return
 
-        if not self.eof():
+        if self._mode == OpenMode.READ or not self.eof():
             self.seek(SeekDir.CURRENT, remain)
         else:
             self.write_padding(remain)
@@ -875,24 +888,38 @@ class BufferStream(Stream):
 
         return len(self.__buffer)
 
-    def open(self, buffer: ByteBuffer, endian: Endian) -> None:
+    def open(self, buffer: ByteBuffer, mode: OpenMode, endian: Endian) -> None:
         """Opens the specified byte buffer
 
         Args:
             buffer (ByteBuffer, optional): Byte buffer to read from. If you want to
                                            build a buffer, use None. Defaults to None.
+            mode (OpenMode): Stream access mode
             endian (Endian): Stream endianness
-        """
-        self._endian = endian
 
+        Raises:
+            ArgumentError: Invalid argument(s) provided
+        """
+        if buffer == None and mode == OpenMode.READ:
+            raise ArgumentError("No buffer specified")
+
+        # Create is not supported
+        if mode == OpenMode.CREATE:
+            mode = OpenMode.WRITE
+
+        self._endian = endian
+        self._mode = mode
         self.__buffer = buffer
         self.__position = 0
 
+        # Create empty buffer for building
         if self.__buffer is None:
-            # Create empty buffer for building
             self.__buffer = bytearray()
-        elif isinstance(self.__buffer, bytes):
-            # Convert bytes to mutable bytearray
+
+        # Read-only buffers use memoryview to avoid copying
+        if self._mode == OpenMode.READ:
+            self.__buffer = memoryview(self.__buffer)
+        elif not isinstance(self.__buffer, bytearray):
             self.__buffer = bytearray(self.__buffer)
 
     @override
@@ -902,7 +929,7 @@ class BufferStream(Stream):
         self.__position = 0
 
     def get(self) -> ByteBuffer:
-        """Accesses the built buffer (read-only)
+        """Accesses the stream buffer
 
         Returns:
             ByteBuffer: Resulting buffer
@@ -914,3 +941,10 @@ class BufferStream(Stream):
             raise OperationError("No buffer is open")
 
         return self.__buffer
+
+
+class BufferStreamView(BufferStream):
+    """Read-only view of an existing BufferStream"""
+
+    def __init__(self, strm: BufferStream):
+        super().__init__(OpenMode.READ, strm.endian, strm.get())

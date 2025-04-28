@@ -4,7 +4,7 @@ from enum import IntFlag, auto
 from typing import override
 
 from .exceptions import ArgumentError, DecompressionError
-from .streams import BufferStream, SeekDir, Stream
+from .streams import BufferStream, OpenMode, SeekDir, Stream
 
 
 class CompressionStrategy(ABC):
@@ -70,7 +70,7 @@ class ClapHanzLZS(CompressionStrategy):
         Returns:
             BufferStream: Stream to compressed data
         """
-        output = BufferStream(strm.endian)
+        output = BufferStream(OpenMode.RW, strm.endian)
 
         # TODO: Fake compression
         while not strm.eof():
@@ -120,7 +120,9 @@ class ClapHanzLZS(CompressionStrategy):
         # File was marked for compression but wasn't actually compressed.
         # Seems like the ClapHanz tools omit compression if it would have wasted space.
         if compress_size == 0:
-            return BufferStream(strm.endian, strm.read(expand_size))
+            return BufferStream(
+                OpenMode.RW, strm.endian, strm.read(expand_size)
+            )
 
         output = bytearray()
 
@@ -165,7 +167,7 @@ class ClapHanzLZS(CompressionStrategy):
         except EOFError:
             raise DecompressionError("Hit the end-of-file while decompressing")
 
-        return BufferStream(strm.endian, output)
+        return BufferStream(OpenMode.RW, strm.endian, output)
 
 
 class ClapHanzHuffman(CompressionStrategy):
@@ -228,7 +230,9 @@ class ClapHanzHuffman(CompressionStrategy):
         # File was marked for compression but wasn't actually compressed.
         # Seems like the ClapHanz tools omit compression if it would have wasted space.
         if compress_size == 0:
-            return BufferStream(strm.endian, strm.read(expand_size))
+            return BufferStream(
+                OpenMode.RW, strm.endian, strm.read(expand_size)
+            )
 
         # Build the Huffman decoding table
         try:
@@ -293,7 +297,7 @@ class ClapHanzHuffman(CompressionStrategy):
         except EOFError:
             raise DecompressionError("Hit the end-of-file while decompressing")
 
-        return BufferStream(strm.endian, output)
+        return BufferStream(OpenMode.RW, strm.endian, output)
 
     @classmethod
     def _rebuild_huffman_table(cls, strm: Stream) -> list[Symbol]:

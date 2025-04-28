@@ -11,7 +11,7 @@ from ..core.exceptions import (
     ArchiveNotFoundError,
     ArgumentError,
 )
-from ..core.streams import Endian, FileStream, OpenMode
+from ..core.streams import BufferStream, Endian, OpenMode, Stream
 
 XBEndian: TypeAlias = Endian
 XBOpenMode: TypeAlias = OpenMode
@@ -172,14 +172,15 @@ class XBArchiveBase(AbstractContextManager):
         if endian not in XBEndian:
             raise ArgumentError("Invalid XBEndian")
 
-        self._strm: FileStream = None
+        self._strm: Stream = None
         self._files: list[XBFile] = []
 
         self._fst: list[XBArchiveBase.FileSystemEntry] = []
         self._strtab: list[XBArchiveBase.StringTableEntry] = []
 
         try:
-            self._strm = FileStream(path, mode, endian)
+            with open(path, f"{mode}b") as f:
+                self._strm = BufferStream(mode, endian, f.read())
         except FileNotFoundError:
             raise ArchiveNotFoundError(f"Archive does not exist: {path}")
         except FileExistsError:
