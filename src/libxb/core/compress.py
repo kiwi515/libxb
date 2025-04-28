@@ -124,16 +124,24 @@ class ClapHanzLZS(CompressionStrategy):
                 OpenMode.RW, strm.endian, strm.read(expand_size)
             )
 
+        # Cache loop invariant attributes
+        c_mask = cls.ChunkFlag.MASK.value
+        c_literal = cls.ChunkFlag.LITERAL.value
+        c_shortrun = cls.ChunkFlag.SHORTRUN.value
+        min_run = cls.MIN_RUN
+        read_u8 = strm.read_u8
+        read = strm.read
+
         output = bytearray()
 
         try:
             while len(output) < expand_size:
-                code = strm.read_u8()
+                code = read_u8()
 
                 # Literal copy
-                if (code & cls.ChunkFlag.MASK.value) == cls.ChunkFlag.LITERAL:
+                if (code & c_mask) == c_literal:
                     copy_len = (code >> 2) + 1
-                    output += strm.read(copy_len)
+                    output += read(copy_len)
 
                 # Run decode
                 else:
@@ -141,19 +149,19 @@ class ClapHanzLZS(CompressionStrategy):
                     run_len = 0
 
                     # Short-distance run
-                    if code & cls.ChunkFlag.SHORTRUN.value:
-                        b0 = strm.read_u8()
+                    if code & c_shortrun:
+                        b0 = read_u8()
                         value = b0 << 8 | code
 
-                        run_len = ((value & 0b1110) >> 1) + cls.MIN_RUN
+                        run_len = ((value & 0b1110) >> 1) + min_run
                         run_offset = value >> 4
                     # Long-distance run
                     else:
-                        b0 = strm.read_u8()
-                        b1 = strm.read_u8()
+                        b0 = read_u8()
+                        b1 = read_u8()
                         value = b1 << 16 | b0 << 8 | code
 
-                        run_len = ((value & 0b111111111100) >> 2) + cls.MIN_RUN
+                        run_len = ((value & 0b111111111100) >> 2) + min_run
                         run_offset = value >> 12
 
                     run_idx = len(output) - run_offset
@@ -251,30 +259,31 @@ class ClapHanzHuffman(CompressionStrategy):
         bit_num = 0
         bit_strm = 0
 
-        # Some data is not compressed correctly, and the bitstream read will
-        # cause an out of bounds access. ClapHanz's decompression code does
-        # not check for this and will cause UB.
-        #
-        # In practice, memory is zeroed out past the end of the buffer, so
-        # the data isn't garbage. We have to emulate this with streams.
-        def next_bits() -> int:
-            try:
-                return strm.read_u16()
-            except EOFError:
-                return 0
+        # Cache loop invariant attributes
+        read_u16 = strm.read_u16
+        max_depth = cls.MAX_DEPTH
+        table_size = cls.TABLE_SIZE
 
         try:
             while out_idx < expand_size:
                 # Read Huffman code and find the table entry
-                if bit_num < cls.MAX_DEPTH:
-                    bit_strm |= next_bits() << bit_num
+                if bit_num < max_depth:
+                    # ClapHanz's decompression code will read out-of-bounds in some cases.
+                    #
+                    # In practice, memory is zeroed out past the end of the buffer, so
+                    # the data is unimportant.
+                    try:
+                        bit_strm |= read_u16() << bit_num
+                    except EOFError:
+                        pass
+
                     bit_num += 16
 
-                index = bit_strm & (cls.TABLE_SIZE - 1)
+                index = bit_strm & (table_size - 1)
                 entry = table[index]
 
                 # Huffman symbol
-                if entry.length <= cls.MAX_DEPTH:
+                if entry.length <= max_depth:
                     # Consume bits based on the symbol length
                     output[out_idx] = entry.symbol & 0xFF
                     out_idx += 1
@@ -283,12 +292,20 @@ class ClapHanzHuffman(CompressionStrategy):
                     bit_num -= entry.length
                 # Literal byte
                 else:
-                    bit_strm >>= cls.MAX_DEPTH
-                    bit_num -= cls.MAX_DEPTH
+                    bit_strm >>= max_depth
+                    bit_num -= max_depth
 
                     # Refresh stream if needed
                     if bit_num < 16:
-                        bit_strm |= next_bits() << bit_num
+                        # ClapHanz's decompression code will read out-of-bounds in some cases.
+                        #
+                        # In practice, memory is zeroed out past the end of the buffer, so
+                        # the data is unimportant.
+                        try:
+                            bit_strm |= read_u16() << bit_num
+                        except EOFError:
+                            pass
+
                         bit_num += 16
 
                     # Consume one byte (8 bits)
@@ -318,10 +335,15 @@ class ClapHanzHuffman(CompressionStrategy):
         Returns:
             list[Symbol]: List of Huffman symbols
         """
+        # Cache loop invariant attributes
+        read_u8 = strm.read_u8
+        max_depth = cls.MAX_DEPTH
+        symbol_cls = cls.Symbol
+
         # Table has a fixed size
         table = [None] * cls.TABLE_SIZE
 
-        max_length = strm.read_u8()
+        max_length = read_u8()
         if max_length == 0:
             raise DecompressionError("Huffman code data is malformed")
 
@@ -330,7 +352,7 @@ class ClapHanzHuffman(CompressionStrategy):
 
         try:
             while length <= max_length:
-                code_num = strm.read_u8()
+                code_num = read_u8()
 
                 # Read all codes of the current length
                 for _ in range(code_num):
@@ -342,14 +364,14 @@ class ClapHanzHuffman(CompressionStrategy):
                         index = index << 1 | (code_bits & 0b1)
                         code_bits >>= 1
 
-                    symbol = strm.read_u8()
+                    symbol = read_u8()
 
                     # Duplicate symbols which match the prefix?
                     while index < len(table):
-                        table[index] = cls.Symbol(length, symbol)
+                        table[index] = symbol_cls(length, symbol)
                         index += 1 << length
 
-                    if length <= cls.MAX_DEPTH:
+                    if length <= max_depth:
                         code += 1
 
                 length += 1
