@@ -156,11 +156,16 @@ class ClapHanzLZS(CompressionStrategy):
                         run_len = ((value & 0b111111111100) >> 2) + cls.MIN_RUN
                         run_offset = value >> 12
 
-                    # Copy block
                     run_idx = len(output) - run_offset
-                    for _ in range(run_len):
-                        output.append(output[run_idx])
-                        run_idx += 1
+
+                    # No overlap: Copy by slice
+                    if run_offset >= run_len:
+                        output += output[run_idx : run_idx + run_len]
+                    # Overlap: must go byte-by-byte
+                    else:
+                        for _ in range(run_len):
+                            output.append(output[run_idx])
+                            run_idx += 1
 
         except IndexError:
             raise DecompressionError("Compressed data is malformed")
