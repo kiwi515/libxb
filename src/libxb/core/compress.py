@@ -254,7 +254,6 @@ class ClapHanzHuffman(CompressionStrategy):
             raise DecompressionError("Failed to create Huffman table")
 
         output = bytearray(expand_size)
-        out_idx = 0
 
         bit_num = 0
         bit_strm = 0
@@ -265,7 +264,7 @@ class ClapHanzHuffman(CompressionStrategy):
         table_size = cls.TABLE_SIZE
 
         try:
-            while out_idx < expand_size:
+            for i in range(expand_size):
                 # Read Huffman code and find the table entry
                 if bit_num < max_depth:
                     # ClapHanz's decompression code will read out-of-bounds in some cases.
@@ -285,8 +284,7 @@ class ClapHanzHuffman(CompressionStrategy):
                 # Huffman symbol
                 if entry.length <= max_depth:
                     # Consume bits based on the symbol length
-                    output[out_idx] = entry.symbol & 0xFF
-                    out_idx += 1
+                    output[i] = entry.symbol & 0xFF
 
                     bit_strm >>= entry.length
                     bit_num -= entry.length
@@ -309,11 +307,11 @@ class ClapHanzHuffman(CompressionStrategy):
                         bit_num += 16
 
                     # Consume one byte (8 bits)
-                    output[out_idx] = bit_strm & 0xFF
-                    out_idx += 1
+                    output[i] = bit_strm & 0xFF
 
                     bit_strm >>= 8
                     bit_num -= 8
+
         except IndexError:
             raise DecompressionError("Compressed data is malformed")
         except EOFError:
