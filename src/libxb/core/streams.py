@@ -173,7 +173,7 @@ class Stream(AbstractContextManager):
         Returns:
             int: Integer value
         """
-        return self.__bytes_to_int(self.read(1), signed=True)
+        return unpack("b", self.read(1))[0]
 
     def write_s8(self, value: int) -> None:
         """Writes a signed 8-bit integer to the stream
@@ -181,7 +181,7 @@ class Stream(AbstractContextManager):
         Args:
             data (int): Integer value
         """
-        return self.write(self.__int_to_bytes(value, size=1, signed=True))
+        return self.write(pack("b", value))
 
     def read_u8(self) -> int:
         """Reads a unsigned 8-bit integer from the stream
@@ -189,7 +189,7 @@ class Stream(AbstractContextManager):
         Returns:
             int: Integer value
         """
-        return self.__bytes_to_int(self.read(1), signed=False)
+        return unpack("B", self.read(1))[0]
 
     def write_u8(self, value: int) -> None:
         """Writes a unsigned 8-bit integer to the stream
@@ -197,7 +197,7 @@ class Stream(AbstractContextManager):
         Args:
             value (int): Integer value
         """
-        return self.write(self.__int_to_bytes(value, size=1, signed=False))
+        return self.write(pack("B", value))
 
     def read_s16(self) -> int:
         """Reads a signed 16-bit integer from the stream
@@ -205,7 +205,7 @@ class Stream(AbstractContextManager):
         Returns:
             int: Integer value
         """
-        return self.__bytes_to_int(self.read(2), signed=True)
+        return unpack("h", self.read(2))[0]
 
     def write_s16(self, value: int) -> None:
         """Writes a signed 16-bit integer to the stream
@@ -213,7 +213,7 @@ class Stream(AbstractContextManager):
         Args:
             value (int): Integer value
         """
-        return self.write(self.__int_to_bytes(value, size=2, signed=True))
+        return self.write(pack("h", value))
 
     def read_u16(self) -> int:
         """Reads a unsigned 16-bit integer from the stream
@@ -221,7 +221,7 @@ class Stream(AbstractContextManager):
         Returns:
             int: Integer value
         """
-        return self.__bytes_to_int(self.read(2), signed=False)
+        return unpack("H", self.read(2))[0]
 
     def write_u16(self, value: int) -> None:
         """Writes a unsigned 16-bit integer to the stream
@@ -229,7 +229,7 @@ class Stream(AbstractContextManager):
         Args:
             value (int): Integer value
         """
-        return self.write(self.__int_to_bytes(value, size=2, signed=False))
+        return self.write(pack("H", value))
 
     def read_s32(self) -> int:
         """Reads a signed 32-bit integer from the stream
@@ -237,7 +237,7 @@ class Stream(AbstractContextManager):
         Returns:
             int: Integer value
         """
-        return self.__bytes_to_int(self.read(4), signed=True)
+        return unpack("l", self.read(4))[0]
 
     def write_s32(self, value: int) -> None:
         """Writes a signed 32-bit integer to the stream
@@ -245,7 +245,7 @@ class Stream(AbstractContextManager):
         Args:
             value (int): Integer value
         """
-        return self.write(self.__int_to_bytes(value, size=4, signed=True))
+        return self.write(pack("l", value))
 
     def read_u32(self) -> int:
         """Reads a unsigned 32-bit integer from the stream
@@ -253,7 +253,7 @@ class Stream(AbstractContextManager):
         Returns:
             int: Integer value
         """
-        return self.__bytes_to_int(self.read(4), signed=False)
+        return unpack("L", self.read(4))[0]
 
     def write_u32(self, value: int) -> None:
         """Writes a unsigned 32-bit integer to the stream
@@ -261,7 +261,7 @@ class Stream(AbstractContextManager):
         Args:
             value (int): Integer value
         """
-        return self.write(self.__int_to_bytes(value, size=4, signed=False))
+        return self.write(pack("L", value))
 
     def read_f32(self) -> float:
         """Reads a single-precision, floating-point value from the stream
@@ -269,7 +269,7 @@ class Stream(AbstractContextManager):
         Returns:
             float: Single-precision, floating-point value
         """
-        return self.__bytes_to_dec(self.read(4))
+        return unpack("f", self.read(4))[0]
 
     def write_f32(self, value: float) -> None:
         """Writes a single-precision, floating-point value to the stream
@@ -277,7 +277,7 @@ class Stream(AbstractContextManager):
         Args:
             value (float): Single-precision, floating-point value
         """
-        return self.write(self.__dec_to_bytes(value, size=4))
+        return self.write(pack("f", value))
 
     def read_f64(self) -> float:
         """Reads a double-precision, floating-point value from the stream
@@ -285,7 +285,7 @@ class Stream(AbstractContextManager):
         Returns:
             float: Double-precision, floating-point value
         """
-        return self.__bytes_to_dec(self.read(8))
+        return unpack("d", self.read(8))[0]
 
     def write_f64(self, value: float) -> None:
         """Writes a double-precision, floating-point value to the stream
@@ -293,7 +293,7 @@ class Stream(AbstractContextManager):
         Args:
             value (float): Double-precision, floating-point value
         """
-        return self.write(self.__dec_to_bytes(value, size=8))
+        return self.write(pack("d", value))
 
     def read_string(self, maxlen: int = -1) -> str:
         """Reads a UTF-8 string from the stream
@@ -452,70 +452,6 @@ class Stream(AbstractContextManager):
             raise ArgumentError("Invalid size")
 
         self.write(bytes([0x00] * size))
-
-    def __int_to_bytes(self, value: int, size: int, signed: bool) -> bytes:
-        """Converts an integer value into bytes, based on the stream endianness
-
-        Args:
-            value (int): Integer value
-            size (int): Number of bytes to use
-            signed (bool): Whether the value should be expressed as signed
-
-        Returns:
-            bytes: Byte representations
-        """
-        endian = {
-            Endian.LITTLE: "little",
-            Endian.BIG: "big",
-        }[self._endian]
-
-        value &= (2 ** (size * 8)) - 1
-        return int.to_bytes(value, length=size, byteorder=endian, signed=signed)
-
-    def __bytes_to_int(self, data: bytes, signed: bool) -> int:
-        """Converts bytes into an integer value, based on the stream endianness
-
-        Args:
-            data (bytes): Byte representation
-            signed (bool): Whether the value should be treated as signed
-
-        Returns:
-            int: Integer value
-        """
-        endian = {
-            Endian.LITTLE: "little",
-            Endian.BIG: "big",
-        }[self._endian]
-
-        return int.from_bytes(data, byteorder=endian, signed=signed)
-
-    def __dec_to_bytes(self, value: float, size: int) -> bytes:
-        """Converts a decimal value into bytes, based on the stream endianness
-
-        Args:
-            value (float): Decimal value
-            size (int): Number of bytes to use
-            signed (bool): Whether the value should be expressed as signed
-
-        Returns:
-            bytes: Byte representations
-        """
-        t = "d" if size == 8 else "f"
-        arr = pack(f"{self._endian}{t}", value)
-        return bytes(arr)
-
-    def __bytes_to_dec(self, data: bytes) -> float:
-        """Converts bytes into a decimal value, based on the stream endianness
-
-        Args:
-            data (bytes): Byte representation
-
-        Returns:
-            float: Decimal value value
-        """
-        t = "d" if len(data) == 8 else "f"
-        arr = unpack(f"{self._endian}{t}", data)
-        return arr[0]
 
 
 class FileStream(Stream):
@@ -870,10 +806,10 @@ class BufferStream(Stream):
         if mode == OpenMode.CREATE:
             mode = OpenMode.WRITE
 
-        self._endian = endian
-        self._mode = mode
         self.__buffer = buffer
         self.__position = 0
+        self._mode = mode
+        self._endian = endian
 
         # Create empty buffer for building
         if self.__buffer is None:
