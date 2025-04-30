@@ -11,7 +11,7 @@ from ..core.exceptions import (
     ArchiveNotFoundError,
     ArgumentError,
 )
-from ..core.streams import BufferStream, Endian, OpenMode, Stream
+from ..core.streams import BufferStream, Endian, FileStream, OpenMode, Stream
 
 XBEndian: TypeAlias = Endian
 XBOpenMode: TypeAlias = OpenMode
@@ -178,17 +178,18 @@ class XBArchiveBase(AbstractContextManager):
         self._fst: list[XBArchiveBase.FileSystemEntry] = []
         self._strtab: list[XBArchiveBase.StringTableEntry] = []
 
-        try:
-            with open(path, f"{mode}b") as f:
-                self._strm = BufferStream(mode, endian, f.read())
-        except FileNotFoundError:
-            raise ArchiveNotFoundError(f"Archive does not exist: {path}")
-        except FileExistsError:
-            raise ArchiveExistsError(f"Archive already exists: {path}")
-
-        # Need to read existing content
-        if self._strm.mode in (XBOpenMode.READ, XBOpenMode.RW):
-            self._read()
+        if mode in (XBOpenMode.READ, XBOpenMode.RW):
+            try:
+                with open(path, f"{mode}b") as f:
+                    self._strm = BufferStream(mode, endian, f.read())
+                    self._read()
+            except FileNotFoundError:
+                raise ArchiveNotFoundError(f"Archive does not exist: {path}")
+        else:
+            try:
+                self._strm = FileStream(path, mode, endian)
+            except FileExistsError:
+                raise ArchiveExistsError(f"Archive already exists: {path}")
 
     def close(self) -> None:
         """Closes the XB archive, committing any changes made"""
@@ -230,6 +231,11 @@ class XBArchiveBase(AbstractContextManager):
 
         # Process all files in directory
         if isdir(path):
+            path = path.replace("/", "\\")
+
+            if path[-1] != "\\":
+                path = f"{path}\\"
+
             for wpath, _, wfiles in walk(path):
                 for file in wfiles:
                     self.add(
@@ -241,6 +247,7 @@ class XBArchiveBase(AbstractContextManager):
 
                 if not recursive:
                     break
+
             return
 
         # Process a single file

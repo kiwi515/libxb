@@ -253,7 +253,7 @@ class XBArchive(XBArchiveBase):
         # Calculate the offset of the file data section
         offset = 0
         offset += self.__header_work.length()
-        offset += self.__fst_work.length()
+        offset += (4 + 4) * len(self._files)  # FST size ahead-of-time
         offset += self.__strtab_work.length()
 
         for index, file in enumerate(self._files):
@@ -280,21 +280,26 @@ class XBArchive(XBArchiveBase):
         """Prepares the archive string table (strtab) for writing"""
         self.__strtab_work = BufferStream(OpenMode.RW, self.endian)
 
+        strtab_data = BufferStream(OpenMode.RW, self.endian)
         for file in self._files:
             entry = self.StringTableEntry(file.path)
 
-            self.__strtab_work.write_u8(len(entry.value))
-            self.__strtab_work.write_u8(entry.hash())
-            self.__strtab_work.write_sjis_string(entry.value)
+            strtab_data.write_u8(len(entry.value))
+            strtab_data.write_u8(entry.hash())
+            strtab_data.write_sjis_string(entry.value)
 
-        # String table is LZS compressed
-        self.__strtab_work.seek(SeekDir.BEGIN)
-        data = ClapHanzLZS.compress(self.__strtab_work).get()
+        # TODO: LZS not yet implemented.
+        self.__strtab_work.write_u32(strtab_data.length())  # expand_size
+        self.__strtab_work.write_u32(0)  # compress_size
+        self.__strtab_work.write(strtab_data.get())
 
-        # Only compress the string table if it saves space
-        if len(data) < self.__strtab_work.length():
-            self.__strtab_work.close()
-            self.__strtab_work = BufferStream(OpenMode.RW, self.endian, data)
+        # # String table is LZS compressed
+        # data = ClapHanzLZS.compress(self.__strtab_work).get()
+
+        # # Only compress the string table if it saves space
+        # if len(data) < self.__strtab_work.length():
+        #     self.__strtab_work.close()
+        #     self.__strtab_work = BufferStream(OpenMode.RW, self.endian, data)
 
         # Sections are aligned to 4-byte boundary
         Util.align(self.__strtab_work, 4)
@@ -315,5 +320,5 @@ class XBArchive(XBArchiveBase):
                     data = ClapHanzDeflate.compress(strm).get()
 
             # Files are aligned to 4-byte boundaries
-            Util.align(data, 4)
+            data = Util.align(data, 4)
             self.__files_work.append(data)

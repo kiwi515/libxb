@@ -70,22 +70,7 @@ class ClapHanzLZS(CompressionStrategy):
         Returns:
             BufferStream: Stream to compressed data
         """
-        output = BufferStream(OpenMode.RW, strm.endian)
-
-        # TODO: Fake compression
-        while not strm.eof():
-            chunk = strm.read(64)
-            code = (len(chunk) - 1) << 2 | cls.ChunkFlag.LITERAL
-            output.write_u8(code)
-            output.write(chunk)
-
-        # Write header
-        output.seek(SeekDir.BEGIN)
-        output.write_u32(strm.length())  # Decomp size
-        output.write_u32(output.length())  # Compress size
-
-        output.seek(SeekDir.BEGIN)
-        return output
+        raise NotImplementedError()
 
     @classmethod
     @override
