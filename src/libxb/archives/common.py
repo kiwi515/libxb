@@ -151,6 +151,9 @@ class XBArchiveBase(AbstractContextManager):
 
     def __exit__(self, exc_type, exc_value, traceback):
         """Exits the runtime context, closing the XB archive"""
+        if exc_value:
+            raise exc_value
+
         self.close()
 
     def open(self, path: str, mode: XBOpenMode, endian: XBEndian) -> None:
@@ -240,7 +243,7 @@ class XBArchiveBase(AbstractContextManager):
                 for file in wfiles:
                     self.add(
                         join(wpath, file),
-                        join(xb_path, file),
+                        join(wpath.replace(path, xb_path), file),
                         compression,
                         recursive,
                     )
