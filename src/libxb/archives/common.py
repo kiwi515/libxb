@@ -2,7 +2,7 @@ from abc import abstractmethod
 from contextlib import AbstractContextManager
 from enum import IntEnum, auto, unique
 from os import makedirs, walk
-from os.path import dirname, isdir, join
+from os.path import basename, dirname, isdir, join, relpath
 from typing import TypeAlias
 
 from ..core.exceptions import (
@@ -89,7 +89,13 @@ class XBArchiveBase(AbstractContextManager):
 
             Args:
                 value (str): String value
+
+            Raises:
+                ArchiveError: Archive cannot be created due to the XB format limitations
             """
+            if len(value) > 0xFF:
+                raise ArchiveError(f"Path is too too long (> 255): {value}")
+
             self.value: str = value
             self.__data: bytes = value.encode("shift-jis")
 
@@ -210,20 +216,22 @@ class XBArchiveBase(AbstractContextManager):
     def add(
         self,
         path: str,
-        xb_path=None,
+        xb_path: str = None,
         compression: XBCompression = XBCompression.NONE,
-        recursive=True,
+        recursive: bool = True,
+        verbose: bool = False,
     ) -> None:
         """Adds a file or directory to the XB archive
 
         Args:
             path (str): Path to the file or directory
             xb_path (str, optional) Path to use in the XB archive instead of `path`.
-                                    Defaults to the local file path.
             compression (XBCompression, optional): How to compress the file.
                                                    Defaults to no compression.
             recursive (bool, optional) Whether to add directories recursively.
                                        Defaults to True.
+            verbose (bool, optional): Whether to log file names as they are added.
+                                      Defaults to False.
 
         Raises:
             ArgumentError: Invalid argument(s) provided
@@ -232,43 +240,58 @@ class XBArchiveBase(AbstractContextManager):
         if compression not in XBCompression:
             raise ArgumentError("Invalid XBCompression")
 
+        # The games expect backslash only
+        path = path.replace("/", "\\")
+        if xb_path:
+            xb_path = xb_path.replace("/", "\\")
+
         # Process all files in directory
         if isdir(path):
-            path = path.replace("/", "\\")
-
-            if path[-1] != "\\":
-                path = f"{path}\\"
-
             for wpath, _, wfiles in walk(path):
                 for file in wfiles:
+                    # Absolute filepath
+                    full_path = join(wpath, file)
+                    # Filepath relative to this directory
+                    rel_path = relpath(full_path, path)
+
+                    if xb_path:
+                        arc_path = join(xb_path, rel_path)
+                    else:
+                        arc_path = rel_path
+
                     self.add(
-                        join(wpath, file),
-                        join(wpath.replace(path, xb_path), file),
-                        compression,
-                        recursive,
+                        full_path, arc_path, compression, recursive, verbose
                     )
 
                 if not recursive:
                     break
 
-            return
-
         # Process a single file
-        try:
-            with open(path, "rb") as f:
-                data = f.read()
-        except FileNotFoundError:
-            raise ArchiveError(f"File does not exist: {path}")
+        else:
+            # Archive will contain relative paths
+            if not xb_path:
+                xb_path = basename(path)
 
-        file = XBFile(xb_path or path, data, compression)
+            if verbose:
+                print(xb_path)
 
-        # Allow subclasses to modify/reject file
-        if not self._on_add(file):
-            return
+            try:
+                with open(path, "rb") as f:
+                    data = f.read()
+            except FileNotFoundError:
+                raise ArchiveError(f"File does not exist: {path}")
 
-        self._files.append(file)
+            file = XBFile(xb_path, data, compression)
 
-    def extract_all(self, path=".", files: list[XBFile] = None) -> None:
+            # Allow subclasses to modify/reject file
+            if not self._on_add(file):
+                return
+
+            self._files.append(file)
+
+    def extract_all(
+        self, path: str = ".", files: list[XBFile] = None, verbose: bool = False
+    ) -> None:
         """Extracts all specified files from the XB archive
 
         Args:
@@ -276,15 +299,20 @@ class XBArchiveBase(AbstractContextManager):
                                   Defaults to the current working directory (".").
             files (list[XBFile], optional): Specific files to extract.
                                             Ignore this field to extract all files.
+            verbose (bool, optional): Whether to log file names as they are extracted.
+                                      Defaults to False.
         """
         # Default behavior attempts to extract all files
         if files is None:
             files = self._files
 
-        for file in files:
+        for i, file in enumerate(files):
+            if verbose:
+                print(f"[{i + 1}/{len(files)}] {file.path}")
+
             self.extract(file, path)
 
-    def extract(self, file: XBFile, path=".") -> None:
+    def extract(self, file: XBFile, path: str = ".") -> None:
         """Extracts one file from the XB archive
 
         Args:
