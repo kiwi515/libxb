@@ -205,7 +205,7 @@ class Stream(AbstractContextManager):
         Returns:
             int: Integer value
         """
-        return unpack("h", self.read(2))[0]
+        return unpack(f"{self.endian}h", self.read(2))[0]
 
     def write_s16(self, value: int) -> None:
         """Writes a signed 16-bit integer to the stream
@@ -213,7 +213,7 @@ class Stream(AbstractContextManager):
         Args:
             value (int): Integer value
         """
-        return self.write(pack("h", value))
+        return self.write(pack(f"{self.endian}h", value))
 
     def read_u16(self) -> int:
         """Reads a unsigned 16-bit integer from the stream
@@ -221,7 +221,7 @@ class Stream(AbstractContextManager):
         Returns:
             int: Integer value
         """
-        return unpack("H", self.read(2))[0]
+        return unpack(f"{self.endian}H", self.read(2))[0]
 
     def write_u16(self, value: int) -> None:
         """Writes a unsigned 16-bit integer to the stream
@@ -229,7 +229,7 @@ class Stream(AbstractContextManager):
         Args:
             value (int): Integer value
         """
-        return self.write(pack("H", value))
+        return self.write(pack(f"{self.endian}H", value))
 
     def read_s32(self) -> int:
         """Reads a signed 32-bit integer from the stream
@@ -237,7 +237,7 @@ class Stream(AbstractContextManager):
         Returns:
             int: Integer value
         """
-        return unpack("l", self.read(4))[0]
+        return unpack(f"{self.endian}l", self.read(4))[0]
 
     def write_s32(self, value: int) -> None:
         """Writes a signed 32-bit integer to the stream
@@ -245,7 +245,7 @@ class Stream(AbstractContextManager):
         Args:
             value (int): Integer value
         """
-        return self.write(pack("l", value))
+        return self.write(pack(f"{self.endian}l", value))
 
     def read_u32(self) -> int:
         """Reads a unsigned 32-bit integer from the stream
@@ -253,7 +253,7 @@ class Stream(AbstractContextManager):
         Returns:
             int: Integer value
         """
-        return unpack("L", self.read(4))[0]
+        return unpack(f"{self.endian}L", self.read(4))[0]
 
     def write_u32(self, value: int) -> None:
         """Writes a unsigned 32-bit integer to the stream
@@ -261,7 +261,7 @@ class Stream(AbstractContextManager):
         Args:
             value (int): Integer value
         """
-        return self.write(pack("L", value))
+        return self.write(pack(f"{self.endian}L", value))
 
     def read_f32(self) -> float:
         """Reads a single-precision, floating-point value from the stream
@@ -269,7 +269,7 @@ class Stream(AbstractContextManager):
         Returns:
             float: Single-precision, floating-point value
         """
-        return unpack("f", self.read(4))[0]
+        return unpack(f"{self.endian}f", self.read(4))[0]
 
     def write_f32(self, value: float) -> None:
         """Writes a single-precision, floating-point value to the stream
@@ -277,7 +277,7 @@ class Stream(AbstractContextManager):
         Args:
             value (float): Single-precision, floating-point value
         """
-        return self.write(pack("f", value))
+        return self.write(pack(f"{self.endian}f", value))
 
     def read_f64(self) -> float:
         """Reads a double-precision, floating-point value from the stream
@@ -285,7 +285,7 @@ class Stream(AbstractContextManager):
         Returns:
             float: Double-precision, floating-point value
         """
-        return unpack("d", self.read(8))[0]
+        return unpack(f"{self.endian}d", self.read(8))[0]
 
     def write_f64(self, value: float) -> None:
         """Writes a double-precision, floating-point value to the stream
@@ -293,7 +293,7 @@ class Stream(AbstractContextManager):
         Args:
             value (float): Double-precision, floating-point value
         """
-        return self.write(pack("d", value))
+        return self.write(pack(f"{self.endian}d", value))
 
     def read_string(self, maxlen: int = -1) -> str:
         """Reads a UTF-8 string from the stream

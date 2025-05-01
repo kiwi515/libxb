@@ -9,7 +9,6 @@ from ..archives.presets import (
     MNTArchive,
     MNTPArchive,
 )
-from .exceptions import XBError
 
 
 class CLI:
@@ -127,7 +126,7 @@ class CLI:
         try:
             with archive_cls(src_path, "r") as arc:
                 arc.extract_all(path=args.output, verbose=args.verbose)
-        except XBError as err:
+        except Exception as err:
             print(f"[ERROR] Failed to extract {src_path}:")
             print(err)
             return False
@@ -167,7 +166,7 @@ class CLI:
                         xb_path = args.root
 
                     arc.add(path=path, xb_path=xb_path, verbose=args.verbose)
-        except XBError as err:
+        except Exception as err:
             print(f"[ERROR] Failed to create {args.output}:")
             print(err)
             return False
