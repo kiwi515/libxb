@@ -21,6 +21,9 @@ license-files = ["LICEN[CS]E*"]
 Homepage = "https://github.com/kiwi515/libxb"
 Issues = "https://github.com/kiwi515/libxb/issues"
 
+[project.scripts]
+libxb = "libxb.driver:main"
+
 [tool.black]
 line-length = 80
 

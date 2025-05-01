@@ -1,6 +1,4 @@
-import sys
-
-from .core.cli import CLI
+from .driver import main
 
 if __name__ == "__main__":
-    sys.exit(CLI.main())
+    main()

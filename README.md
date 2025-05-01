@@ -5,7 +5,9 @@ Python library for the ClapHanz XB archive format
 
 
 ## User Interface
-libxb provides a command-line interface for those who wish to use it as a tool. You can run it as part of the `libxb` Python package (`python -m libxb ...`):
+libxb provides a command-line interface for those who wish to use it as a tool.
+
+Once you install the package via `pip`, it can be accessed via the main module (`python -m libxb ...`), or via its entrypoint script (`libxb ...`).
 
 ### Usage
 ```
@@ -34,18 +36,18 @@ options:
 ### Examples
 ```sh
 # Extract mRoomSel.xb as MNGP archive (creates "mRoomSel.xb.d" directory)
-python -m libxb -g mngp -x mRoomSel.xb
+libxb -g mngp -x mRoomSel.xb
 # Extract mRoomSel.xb as MNGP archive (creates "my_cool_path" directory)
-python -m libxb -g mngp -o my_cool_path -x mRoomSel.xb
+libxb -g mngp -o my_cool_path -x mRoomSel.xb
 
 # Create a MNGP archive from files in mRoomSel.xb.d directory (creates "mRoomSel.xb" file)
-python -m libxb -g mngp -c mRoomSel.xb.d
+libxb -g mngp -c mRoomSel.xb.d
 # Create a MNGP archive from files in mRoomSel.xb.d directory (creates "mRoomSelNew.xb" file)
-python -m libxb -g mngp -o mRoomSelNew.xb -c mRoomSel.xb.d
+libxb -g mngp -o mRoomSelNew.xb -c mRoomSel.xb.d
 
 # Create a MNGP archive from three specified files (creates "ss.xb" file)
 # Root directory is specified as "../data/", so all files in the archive get that prefix.
-python -m libxb -g mngp -o ss.xb -c config.dat ss.info sponsor.dat -r ../data/
+libxb -g mngp -o ss.xb -c config.dat ss.info sponsor.dat -r ../data/
 ```
 
 ## Developer Interface
