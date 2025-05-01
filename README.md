@@ -1,8 +1,10 @@
 # libxb
 Python library for the ClapHanz XB archive format
 
+[![python](https://img.shields.io/badge/Python-3.10-3776AB.svg?style=flat&logo=python&logoColor=white)](https://www.python.org)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
-
+[![License: GPLv3](https://img.shields.io/badge/License-MIT-orange.svg)](https://opensource.org/license/mit)
+[![PyPI version](https://badge.fury.io/py/libxb.svg)](https://badge.fury.io/py/libxb)
 
 ## User Interface
 libxb provides a command-line interface for those who wish to use it as a tool.
