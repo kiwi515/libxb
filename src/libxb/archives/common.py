@@ -1,5 +1,4 @@
 from abc import abstractmethod
-from contextlib import AbstractContextManager
 from enum import IntEnum, auto, unique
 from os import makedirs, walk
 from os.path import basename, dirname, isdir, join, relpath
@@ -51,7 +50,7 @@ class XBFile:
         self.compression: XBCompression = compression
 
 
-class XBArchiveBase(AbstractContextManager):
+class XBArchiveBase:
     """Generic interface for XB archives (.XB file format).
     Subclasses implement concepts which may differ between revisions of the XB format.
     """
@@ -120,13 +119,20 @@ class XBArchiveBase(AbstractContextManager):
 
             return hash & 0xFF
 
-    def __init__(self, path: str, mode: XBOpenMode, endian: XBEndian):
+    def __init__(
+        self,
+        path: str,
+        mode: XBOpenMode,
+        endian: XBEndian,
+        verbose: bool = False,
+    ):
         """Constructor
 
         Args:
             path (str): File path to open
             mode (XBOpenMode): File open mode
             endian (XBEndian): File endianness
+            verbose (bool, optional): Enable verbose logging. Defaults to False.
 
         Raises:
             ArgumentError: Invalid argument(s) provided
@@ -134,6 +140,8 @@ class XBArchiveBase(AbstractContextManager):
             ArchiveExistsError: Archive file already exists
             BadArchiveError: Archive file is broken or corrupted
         """
+        self._verbose = verbose
+
         self.open(path, mode, endian)
 
     @property
@@ -154,6 +162,10 @@ class XBArchiveBase(AbstractContextManager):
     def __iter__(self):
         """Iterates over the archive's files (read-only)"""
         return self._files.__iter__()
+
+    def __enter__(self):
+        """Enters the runtime context"""
+        return self
 
     def __exit__(self, exc_type, exc_value, traceback):
         """Exits the runtime context, closing the XB archive"""
@@ -219,7 +231,6 @@ class XBArchiveBase(AbstractContextManager):
         xb_path: str = None,
         compression: XBCompression = XBCompression.NONE,
         recursive: bool = True,
-        verbose: bool = False,
     ) -> None:
         """Adds a file or directory to the XB archive
 
@@ -230,8 +241,6 @@ class XBArchiveBase(AbstractContextManager):
                                                    Defaults to no compression.
             recursive (bool, optional) Whether to add directories recursively.
                                        Defaults to True.
-            verbose (bool, optional): Whether to log file names as they are added.
-                                      Defaults to False.
 
         Raises:
             ArgumentError: Invalid argument(s) provided
@@ -239,11 +248,6 @@ class XBArchiveBase(AbstractContextManager):
         """
         if compression not in XBCompression:
             raise ArgumentError("Invalid XBCompression")
-
-        # The games expect backslash only
-        path = path.replace("/", "\\")
-        if xb_path:
-            xb_path = xb_path.replace("/", "\\")
 
         # Process all files in directory
         if isdir(path):
@@ -259,9 +263,7 @@ class XBArchiveBase(AbstractContextManager):
                     else:
                         arc_path = rel_path
 
-                    self.add(
-                        full_path, arc_path, compression, recursive, verbose
-                    )
+                    self.add(full_path, arc_path, compression, recursive)
 
                 if not recursive:
                     break
@@ -271,9 +273,6 @@ class XBArchiveBase(AbstractContextManager):
             # Archive will contain relative paths
             if not xb_path:
                 xb_path = basename(path)
-
-            if verbose:
-                print(xb_path)
 
             try:
                 with open(path, "rb") as f:
@@ -289,9 +288,7 @@ class XBArchiveBase(AbstractContextManager):
 
             self._files.append(file)
 
-    def extract_all(
-        self, path: str = ".", files: list[XBFile] = None, verbose: bool = False
-    ) -> None:
+    def extract_all(self, path: str = ".", files: list[XBFile] = None) -> None:
         """Extracts all specified files from the XB archive
 
         Args:
@@ -299,17 +296,12 @@ class XBArchiveBase(AbstractContextManager):
                                   Defaults to the current working directory (".").
             files (list[XBFile], optional): Specific files to extract.
                                             Ignore this field to extract all files.
-            verbose (bool, optional): Whether to log file names as they are extracted.
-                                      Defaults to False.
         """
         # Default behavior attempts to extract all files
         if files is None:
             files = self._files
 
-        for i, file in enumerate(files):
-            if verbose:
-                print(f"[{i + 1}/{len(files)}] {file.path}")
-
+        for file in files:
             self.extract(file, path)
 
     def extract(self, file: XBFile, path: str = ".") -> None:

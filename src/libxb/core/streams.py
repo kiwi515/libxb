@@ -1,5 +1,4 @@
 from abc import abstractmethod
-from contextlib import AbstractContextManager
 from enum import IntEnum, StrEnum, unique
 from os import SEEK_CUR, SEEK_END, SEEK_SET
 from struct import pack, unpack
@@ -42,7 +41,7 @@ class SeekDir(IntEnum):
     END = SEEK_END
 
 
-class Stream(AbstractContextManager):
+class Stream:
     """Base stream class.
     Derived classes can be used as context managers ('with' statements).
     """
@@ -75,6 +74,10 @@ class Stream(AbstractContextManager):
     def endian(self):
         """Accesses the stream's endianness (read-only)"""
         return self._endian
+
+    def __enter__(self):
+        """Enters the runtime context"""
+        return self
 
     def __exit__(self, exc_type, exc_value, traceback):
         """Exits the runtime context, closing the stream"""

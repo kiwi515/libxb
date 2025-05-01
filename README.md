@@ -6,6 +6,11 @@ Python library for the ClapHanz XB archive format
 [![License: GPLv3](https://img.shields.io/badge/License-MIT-orange.svg)](https://opensource.org/license/mit)
 [![PyPI version](https://badge.fury.io/py/libxb.svg)](https://badge.fury.io/py/libxb)
 
+libxb is available for installation via the `pip` package manager:
+```
+python3 -m pip install libxb
+```
+
 ## User Interface
 libxb provides a command-line interface for those who wish to use it as a tool.
 

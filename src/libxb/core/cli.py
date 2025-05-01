@@ -124,8 +124,8 @@ class CLI:
             args.output = f"{src_path}.d"
 
         try:
-            with archive_cls(src_path, "r") as arc:
-                arc.extract_all(path=args.output, verbose=args.verbose)
+            with archive_cls(src_path, "r", verbose=args.verbose) as arc:
+                arc.extract_all(path=args.output)
         except Exception as err:
             print(f"[ERROR] Failed to extract {src_path}:")
             print(err)
@@ -157,7 +157,7 @@ class CLI:
                 args.output = f"{args.create[0]}.xb"
 
         try:
-            with archive_cls(args.output, "w") as arc:
+            with archive_cls(args.output, "w", verbose=args.verbose) as arc:
                 for path in args.create:
                     # "xb_path" argument must be absolute
                     if not isdir(path):
@@ -165,7 +165,7 @@ class CLI:
                     else:
                         xb_path = args.root
 
-                    arc.add(path=path, xb_path=xb_path, verbose=args.verbose)
+                    arc.add(path=path, xb_path=xb_path)
         except Exception as err:
             print(f"[ERROR] Failed to create {args.output}:")
             print(err)

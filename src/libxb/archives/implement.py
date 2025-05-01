@@ -31,13 +31,20 @@ class XBArchive(XBArchiveBase):
     # File "magic" / "signature"
     SIGNATURE = b"\x78\x65\x00\x01"  # "xe.."
 
-    def __init__(self, path: str, mode: XBOpenMode, endian: XBEndian):
+    def __init__(
+        self,
+        path: str,
+        mode: XBOpenMode,
+        endian: XBEndian,
+        verbose: bool = False,
+    ):
         """Constructor
 
         Args:
             path (str): File path to open
             mode (XBOpenMode): File open mode
             endian (XBEndian): File endianness
+            verbose (bool, optional): Enable verbose logging. Defaults to False.
 
 
         Raises:
@@ -46,7 +53,7 @@ class XBArchive(XBArchiveBase):
             ArchiveExistsError: Archive file already exists
             BadArchiveError: Archive file is broken or corrupted
         """
-        super().__init__(path, mode, endian)
+        super().__init__(path, mode, endian, verbose)
 
     @override
     def open(self, path: str, mode: XBOpenMode, endian: XBEndian) -> None:
@@ -191,6 +198,10 @@ class XBArchive(XBArchiveBase):
 
         for index, entry in enumerate(self._fst):
             self._strm.seek(SeekDir.BEGIN, entry.offset)
+            file_name = self._strtab[index].value
+
+            if self._verbose:
+                print(f"[{index + 1} / {len(self._fst)}] {file_name}")
 
             try:
                 match entry.compression:
@@ -205,7 +216,7 @@ class XBArchive(XBArchiveBase):
             except DecompressionError:
                 raise BadArchiveError("Compressed data is broken")
 
-            file = XBFile(self._strtab[index].value, data, entry.compression)
+            file = XBFile(file_name, data, entry.compression)
             self._files.append(file)
 
     def __prepare_write(self):
@@ -306,8 +317,11 @@ class XBArchive(XBArchiveBase):
 
     def __build_file_data(self) -> None:
         """Prepares the archive file data for writing"""
-        for file in self._files:
+        for index, file in enumerate(self._files):
             strm = BufferStream(OpenMode.READ, self.endian, file.data)
+
+            if self._verbose:
+                print(f"[{index + 1} / {len(self._files)}] {file.path}")
 
             match file.compression:
                 case XBCompression.NONE:
