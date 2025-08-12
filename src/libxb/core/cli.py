@@ -5,6 +5,7 @@ from ..archives.presets import (
     MNG3Archive,
     MNG4Archive,
     MNG5Archive,
+    MNGOArchive,
     MNGPArchive,
     MNTArchive,
     MNTPArchive,
@@ -16,6 +17,7 @@ class CLI:
 
     GAME_TO_CLASS = {
         "mng3": MNG3Archive,
+        "mngo": MNGOArchive,
         "mng4": MNG4Archive,
         "mngp": MNGPArchive,
         "mng5": MNG5Archive,
@@ -46,7 +48,7 @@ class CLI:
             "-g",
             "--game",
             type=str,
-            choices=("mng3", "mng4", "mngp", "mng5", "mnt", "mntp"),
+            choices=("mng3", "mngo", "mng4", "mngp", "mng5", "mnt", "mntp"),
             required=True,
             metavar="<name>",
             help="Target game for the XB archive",

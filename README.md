@@ -102,6 +102,7 @@ Additionally, subclasses are provided for each title to remove the need to speci
 | Title                    | Class             |
 | ------------------------ | ----------------- |
 | Minna no Golf 3          | `MNG3Archive`     |
+| Minna no Golf Online     | `MNGOArchive`     |
 | Minna no Golf 4          | `MNG4Archive`     |
 | Minna no Golf Portable   | `MNGPArchive`     |
 | Minna no Golf 5          | `MNG5Archive`     |

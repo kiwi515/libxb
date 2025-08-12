@@ -16,6 +16,20 @@ class MNG3Archive(XBArchive):
         super().__init__(path, XBOpenMode(mode), XBEndian.LITTLE, verbose)
 
 
+class MNGOArchive(XBArchive):
+    """XB archive for Minna no Golf Online"""
+
+    def __init__(self, path: str, mode: str, verbose: bool = False):
+        """Constructor
+
+        Args:
+            path (str): File path to open
+            mode (str): File open mode ('r'/'w'/'+'/'x')
+            verbose (bool, optional): Enable verbose logging. Defaults to False.
+        """
+        super().__init__(path, XBOpenMode(mode), XBEndian.LITTLE, verbose)
+
+
 class MNG4Archive(XBArchive):
     """XB archive for Minna no Golf 4 / Hot Shots Golf Fore!"""
 

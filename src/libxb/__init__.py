@@ -4,6 +4,7 @@ from .archives.presets import (
     MNG3Archive,
     MNG4Archive,
     MNG5Archive,
+    MNGOArchive,
     MNGPArchive,
     MNTArchive,
     MNTPArchive,
